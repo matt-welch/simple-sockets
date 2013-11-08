@@ -11,3 +11,7 @@
 *.lai
 *.la
 *.a
+*.gch
+
+# ctags tag file
+tags
