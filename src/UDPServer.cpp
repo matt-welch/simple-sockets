@@ -4,6 +4,8 @@
 #include <stdlib.h>     /* for atoi() and exit() */
 #include <string.h>     /* for memset() */
 #include <unistd.h>     /* for close() */
+#include "UDPServer.hpp" // server header file 
+
 
 #define ECHOMAX 255     /* Longest string to echo */
 
@@ -22,6 +24,10 @@ int main(int argc, char *argv[])
     char echoBuffer[ECHOMAX];        /* Buffer for echo string */
     unsigned short echoServPort;     /* Server port */
     int recvMsgSize;                 /* Size of received message */
+
+	/* variables to contain data sent from client and the table of client data */
+	request_t clientRequest;
+	client_table_t clientTable;
 
     if (argc != 2)         /* Test for correct number of parameters */
     {
@@ -51,11 +57,20 @@ int main(int argc, char *argv[])
         cliAddrLen = sizeof(echoClntAddr);
 
         /* Block until receive message from a client */
-        if ((recvMsgSize = recvfrom(sock, echoBuffer, ECHOMAX, 0,
-            (struct sockaddr *) &echoClntAddr, &cliAddrLen)) < 0)
+        if ((recvMsgSize = recvfrom(sock, &clientRequest, sizeof(request_t), 
+						0,(struct sockaddr *) &echoClntAddr, &cliAddrLen)) < 0)
             DieWithError("recvfrom() failed");
 
         printf("Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr));
+
+		string clientKey = "";
+		/* determine if the clientTable already has data from this client */
+		client_table_t::iterator it= clientTable.find(clientKey);
+
+
+		/* copy client request data into the clientTable */
+
+
 
         /* Send received datagram back to the client */
         if (sendto(sock, echoBuffer, recvMsgSize, 0, 
