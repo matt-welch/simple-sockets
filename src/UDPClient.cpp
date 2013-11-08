@@ -4,6 +4,15 @@
 #include <stdlib.h>     /* for atoi() and exit() */
 #include <string.h>     /* for memset() */
 #include <unistd.h>     /* for close() */
+#include "request.hpp"  // header
+#include <time.h>
+
+//for getting ip info
+#include <net/if.h>
+#include <netinet/in.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
+
 
 #define ECHOMAX 255     /* Longest string to echo */
 //-----------------------------------------------------
@@ -14,7 +23,7 @@ void DieWithError(const char *errorMessage) /* External error handling function 
     exit(1);
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])//char  *argv[]
 {
     int sock;                        /* Socket descriptor */
     struct sockaddr_in echoServAddr; /* Echo server address */
@@ -26,15 +35,17 @@ int main(int argc, char *argv[])
     char echoBuffer[ECHOMAX+1];      /* Buffer for receiving echoed string */
     int echoStringLen;               /* Length of string to echo */
     int respStringLen;               /* Length of received response */
-	
-	request_t clientRequest;
 
+	request_t clientRequest; //new reques
 
-    if ((argc < 3) || (argc > 4))    /* Test for correct number of arguments */
-    {
-        fprintf(stderr,"Usage: %s <Server IP> <Echo Word> [<Echo Port>]\n", argv[0]);
-        exit(1);
-    }
+	/* random seed */
+	srand(time(NULL));
+
+//    if ((argc < 3) || (argc > 4))    /* Test for correct number of arguments */
+//    {
+//        fprintf(stderr,"Usage: %s <Server IP> <Echo Word> [<Echo Port>]\n", argv[0]);
+//        exit(1);
+//    }
 
     servIP = argv[1];           /* First arg: server IP address (dotted quad) */
     echoString = argv[2];       /* Second arg: string to echo */
@@ -52,19 +63,52 @@ int main(int argc, char *argv[])
         DieWithError("socket() failed");
 
     /* Construct the server address structure */
-    memset(&echoServAddr, 0, sizeof(echoServAddr));    /* Zero out structure */
-    echoServAddr.sin_family = AF_INET;                 /* Internet addr family */
-    echoServAddr.sin_addr.s_addr = inet_addr(servIP);  /* Server IP address */
-    echoServAddr.sin_port   = htons(echoServPort);     /* Server port */
+ //   	memset(&echoServAddr, 0, sizeof(echoServAddr));    /* Zero out structure */
+  //      echoServAddr.sin_family = AF_INET;                 /* Internet addr family */
+ //       echoServAddr.sin_addr.s_addr = inet_addr(servIP);  /* Server IP address */
+ //       echoServAddr.sin_port   = htons(echoServPort);     /* Server port */
+
+//------- get IP -----------
+int socketDescriptor;//
+struct ifreq interface;
+
+socketDescriptor = socket(AF_INET, SOCK_DGRAM, 0);
+
+//get IPv4 address ################################################
+interface.ifr_addr.sa_family = AF_INET;
+
+//get address attached to eth0
+strncpy(interface.ifr_name, "p4p1", IFNAMSIZ-1);
+
+ioctl(socketDescriptor, SIOCGIFADDR, &interface);
+
+close(socketDescriptor);
+
+//---- we have IP now ????????????????????????????????????????????????????????
+
+strcpy(clientRequest.client_ip, inet_ntoa(((struct sockaddr_in *) &interface.ifr_addr)->sin_addr));
+
+//print our IP address
+printf("IP address = %s\n", clientRequest.client_ip);
+	int requestNum = 0;
+	/* build struct */
+	//clientRequest.client_ip =
+
+
+for(requestNum = 0; requestNum < 20; ++requestNum)
+{
+
+}//end for
+
 
     /* Send the string to the server */
-    if (sendto(sock, echoString, echoStringLen, 0, (struct sockaddr *)
-               &echoServAddr, sizeof(echoServAddr)) != echoStringLen)
-        DieWithError("sendto() sent a different number of bytes than expected");
-  
+   // if (sendto(sock, echoString, echoStringLen, 0, (struct sockaddr *)
+  //             &echoServAddr, sizeof(echoServAddr)) != echoStringLen)
+//        DieWithError("sendto() sent a different number of bytes than expected");
+
     /* Recv a response */
     fromSize = sizeof(fromAddr);
-    if ((respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0, 
+    if ((respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
          (struct sockaddr *) &fromAddr, &fromSize)) != echoStringLen)
         DieWithError("recvfrom() failed");
 
@@ -77,7 +121,7 @@ int main(int argc, char *argv[])
     /* null-terminate the received data */
     echoBuffer[respStringLen] = '\0';
     printf("Received: %s\n", echoBuffer);    /* Print the echoed arg */
-    
+
     close(sock);
     exit(0);
-}
+}//end main
