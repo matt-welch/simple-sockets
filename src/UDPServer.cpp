@@ -6,7 +6,7 @@
 #include <unistd.h>     /* for close() */
 #include "UDPServer.hpp" // server header file 
 
-
+#define DEBUG 1
 #define ECHOMAX 255     /* Longest string to echo */
 
 void DieWithError(const char *errorMessage) /* External error handling function */
@@ -67,8 +67,16 @@ int main(int argc, char *argv[])
 		/* determine if the clientTable already has data from this client */
 		client_table_t::iterator it= clientTable.find(clientKey);
 
-
+#ifdef DEBUG
 		/* copy client request data into the clientTable */
+		printf("Cient Data::\n");
+		printf("clientRequest.client_ip(char*)\t= %s\n", clientRequest.client_ip);
+		printf("clientRequest.inc (int)\t\t= %d\n", clientRequest.inc);
+		printf("clientRequest.client (int)\t= %d\n", clientRequest.client);
+		printf("clientRequest.req (int\t)\t= %d\n", clientRequest.req);
+		printf("clientRequest.c (char)\t\t= %c\n\n", clientRequest.c);
+#endif
+		
 
 
 

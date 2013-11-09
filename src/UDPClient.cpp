@@ -41,11 +41,11 @@ int main(int argc, char* argv[])//char  *argv[]
 	/* random seed */
 	srand(time(NULL));
 
-//    if ((argc < 3) || (argc > 4))    /* Test for correct number of arguments */
-//    {
-//        fprintf(stderr,"Usage: %s <Server IP> <Echo Word> [<Echo Port>]\n", argv[0]);
-//        exit(1);
-//    }
+    if ((argc < 3) || (argc > 4))    /* Test for correct number of arguments */
+    {
+        fprintf(stderr,"Usage: %s <Server IP> <Echo Word> [<Echo Port>]\n", argv[0]);
+        exit(1);
+    }
 
     servIP = argv[1];           /* First arg: server IP address (dotted quad) */
     echoString = argv[2];       /* Second arg: string to echo */
@@ -63,48 +63,53 @@ int main(int argc, char* argv[])//char  *argv[]
         DieWithError("socket() failed");
 
     /* Construct the server address structure */
- //   	memset(&echoServAddr, 0, sizeof(echoServAddr));    /* Zero out structure */
-  //      echoServAddr.sin_family = AF_INET;                 /* Internet addr family */
- //       echoServAddr.sin_addr.s_addr = inet_addr(servIP);  /* Server IP address */
- //       echoServAddr.sin_port   = htons(echoServPort);     /* Server port */
+  	memset(&echoServAddr, 0, sizeof(echoServAddr));    /* Zero out structure */
+      echoServAddr.sin_family = AF_INET;                 /* Internet addr family */
+      echoServAddr.sin_addr.s_addr = inet_addr(servIP);  /* Server IP address */
+      echoServAddr.sin_port   = htons(echoServPort);     /* Server port */
 
-//------- get IP -----------
-int socketDescriptor;//
-struct ifreq interface;
-
-socketDescriptor = socket(AF_INET, SOCK_DGRAM, 0);
-
-//get IPv4 address ################################################
-interface.ifr_addr.sa_family = AF_INET;
-
-//get address attached to eth0
-strncpy(interface.ifr_name, "p4p1", IFNAMSIZ-1);
-
-ioctl(socketDescriptor, SIOCGIFADDR, &interface);
-
-close(socketDescriptor);
-
-//---- we have IP now ????????????????????????????????????????????????????????
-
-strcpy(clientRequest.client_ip, inet_ntoa(((struct sockaddr_in *) &interface.ifr_addr)->sin_addr));
-
-//print our IP address
-printf("IP address = %s\n", clientRequest.client_ip);
+	//------- get IP ----------- // should be a function
+	int socketDescriptor;//
+	struct ifreq interface;
+	
+	socketDescriptor = socket(AF_INET, SOCK_DGRAM, 0);
+	
+	//get IPv4 address ################################################
+	interface.ifr_addr.sa_family = AF_INET;
+	
+	//get address attached to eth0
+	strncpy(interface.ifr_name, "p4p1", IFNAMSIZ-1);
+	
+	ioctl(socketDescriptor, SIOCGIFADDR, &interface);
+	
+	close(socketDescriptor);
+	
+	//---- we have IP now ????????????????????????????????????????????????????????
+	
+	strcpy(clientRequest.client_ip, inet_ntoa(((struct sockaddr_in *) &interface.ifr_addr)->sin_addr));
+	
+	//print our IP address
+	printf("IP address = %s\n", clientRequest.client_ip);
 	int requestNum = 0;
 	/* build struct */
-	//clientRequest.client_ip =
+	//clientRequest.client_ip = "129.219.102.8\0\0"
+	
+	clientRequest.client = 42;
+	for(requestNum = 0; requestNum < 20; ++requestNum)
+	{
+		clientRequest.req = requestNum + 1;
+		clientRequest.inc = clientRequest.req * 2;
+		clientRequest.c   = (char) 97 + requestNum; // 97 == ascii "a"
+
+		/* Send the string to the server */
+		if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
+					&echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
+			DieWithError("sendto() sent a different number of bytes than expected");
+	}//end for
 
 
-for(requestNum = 0; requestNum < 20; ++requestNum)
-{
-
-}//end for
 
 
-    /* Send the string to the server */
-   // if (sendto(sock, echoString, echoStringLen, 0, (struct sockaddr *)
-  //             &echoServAddr, sizeof(echoServAddr)) != echoStringLen)
-//        DieWithError("sendto() sent a different number of bytes than expected");
 
     /* Recv a response */
     fromSize = sizeof(fromAddr);

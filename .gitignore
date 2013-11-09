@@ -15,3 +15,11 @@
 
 # ctags tag file
 tags
+
+# temporary files created by vim
+*~
+*.swp
+
+# binaries for this program
+client
+server

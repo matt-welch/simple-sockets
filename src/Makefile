@@ -24,3 +24,6 @@ tidy: clean
 	rm -f *.*~ *~
 
 CONFIG		= -Wall -pedantic
+
+run: server client
+	./server 65432
