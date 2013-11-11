@@ -1,3 +1,24 @@
+/* **************************************************************************
+ * FILENAME:    UDPClient.cpp
+ * NAME:        UDP Simple Sockets client program
+ * AUTHORS:     Jesse Quale, Matt Welch
+ * SCHOOL:      Arizona Statte University
+ * CLASS:       CSE434: Introduction to Networks
+ * INSTRUCTOR:  Dr. Violet Syrotiuk
+ * SECTION:     
+ * TERM:        Fall 2013
+ * DESCRIPTION: 
+ *      This program is the client-side of a simple UDP sockets based
+ * client-server.  The client is to send a structure to the server containing
+ * information identifying the client, the particular request number, and
+ * a character [a-z] that reprsents the payload of the exchange.  The server
+ * is to keep track of the last five characters of the exchange and a table of
+ * the client requests so that it can resend responses and service requests
+ * based on simulated failure modes of both the client and the server.  The
+ * algorithm of this eschange is more fully described in the README.MD.  
+ * */
+
+// TODO replace c-libraries with C++ libraries
 #include <stdio.h>      /* for printf() and fprintf() */
 #include <sys/socket.h> /* for socket(), connect(), sendto(), and recvfrom() */
 #include <arpa/inet.h>  /* for sockaddr_in and inet_addr() */
@@ -13,14 +34,88 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 
+#include <iostream>
+using std::cout;
+using std::endl;
+using std::cin;
+using std::ostream;
+using std::istream;
+using std::getline;
 
+#include <fstream>
+using namespace std;
+
+#include <string>
+using std::string;
+
+#include <pthread.h>  /* for mutex lock on file access */
+
+#define USEFSTREAM
+#define DEBUG 1
 #define ECHOMAX 255     /* Longest string to echo */
 //-----------------------------------------------------
+
+// lock for accessing the incarnation file
+pthread_mutex_t g_lock_incarnationFile;
 
 void DieWithError(const char *errorMessage) /* External error handling function */
 {
     perror(errorMessage);
     exit(1);
+}
+
+// function unlocks file containing last incarnation number and gets a new
+// number for the client after a failure
+int getIncarnationNum(void){
+    string filename = "incarnum";
+#ifdef USEFSTREAM
+    fstream incFile;
+#else
+    filebuf incFile;
+    ostream output(&incFile);
+    istream input(&incFile);
+#endif
+    string str_incarNumber;
+    int int_incarNumber;
+
+    const char* filename_cstr = filename.c_str();
+#ifdef DEBUG
+    printf("getIncarnationNum::About to open file \"%s\"\n",filename_cstr);
+#endif
+    // lock file access, perform read & write new incarnation number to file
+    pthread_mutex_lock(&g_lock_incarnationFile);
+        incFile.open(filename_cstr, ios::in | ios::out | ios::trunc );
+#ifdef USEFSTREAM
+        // open the file as a filestream
+        if( incFile.is_open() ){
+            getline( incFile, str_incarNumber);
+            cout << "Incarnation Number = " << str_incarNumber << endl;
+        }
+        incFile.close();
+#else
+
+        if(input.fail()){
+            cout << "\nNo file matching \"" << filename << "\" exists\n";
+            cout.flush();
+        }else{
+            input.seekg(0,ios::beg); // seek to the beginning of the file
+            getline(input, str_incarNumber);
+
+            cout << str_incarNumber << endl;
+            if (str_incarNumber.length() == 0)
+                int_incarNumber = 68;
+            else
+                int_incarNumber = atoi(str_incarNumber.c_str());
+    #ifdef DEBUG
+            printf("getIncarnationNum:: int_incarNumber = %d\n", int_incarNumber);
+    #endif 
+            int_incarNumber++;
+            output << int_incarNumber << endl ; 
+            incFile.close();
+        }
+#endif
+    pthread_mutex_unlock(&g_lock_incarnationFile);
+    return(int_incarNumber--);
 }
 
 int main(int argc, char* argv[])//char  *argv[]
@@ -94,13 +189,23 @@ int main(int argc, char* argv[])//char  *argv[]
 	/* build struct */
 	//clientRequest.client_ip = "129.219.102.8\0\0"
 	
+
 	clientRequest.client = 42;
 	for(requestNum = 0; requestNum < 20; ++requestNum)
 	{
 		clientRequest.req = requestNum + 1;
-		clientRequest.inc = clientRequest.req * 2;
+		//TODO randomize the char sent to the server
 		clientRequest.c   = (char) 97 + requestNum; // 97 == ascii "a"
 
+		//TODO simulate failure modes of client
+
+        // get incarnation number by unlocking file, incrementing, and
+        // closing file
+        clientRequest.inc = getIncarnationNum();
+#ifdef DEBUG
+        printf("clientRequest.inc = %d \n", clientRequest.inc);
+        printf("Client :: sending request #%d\n", clientRequest.req);
+#endif
 		/* Send the string to the server */
 		if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
 					&echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
@@ -129,4 +234,5 @@ int main(int argc, char* argv[])//char  *argv[]
 
     close(sock);
     exit(0);
+    return (0);
 }//end main
