@@ -68,99 +68,40 @@ void DieWithError(const char *errorMessage) /* External error handling function 
 // number for the client after a failure
 int getIncarnationNum(void){
     string filename = "incarnum";
-#ifdef USEFSTREAM
-    ifstream incFile;
-#else
-    filebuf incFile;
-    ostream output(&incFile);
-    istream input(&incFile);
-#endif
     string str_incarNumber;
-    int int_incarNumber;
+    int int_incarNumber=0;
 
-    const char* filename_cstr = filename.c_str();
 #ifdef DEBUG
-    printf("getIncarnationNum::About to open file \"%s\"\n",filename_cstr);
+    printf("getIncarnationNum::About to open file \"%s\"\n",filename.c_str());
 #endif
     // lock file access, perform read & write new incarnation number to file
     pthread_mutex_lock(&g_lock_incarnationFile);
-        //incFile.open(filename_cstr);
-#ifdef USEFSTREAM
         // open the file as a filestream
-            ifstream infile(filename_cstr);
+            ifstream infile( filename.c_str() );
             string inString;
-            if(infile.good() ) {
+
+            if( infile.fail() ) {
+                cout << "No file <" << filename << "> found; creating file with incarnation number = 0" 
+                    << endl;
+            }else{
                 getline(infile, inString);
+#ifdef DEBUG
                 cout << "Incarnation Number = <" << inString << ">" << endl;
-                int_incarNumber = atoi( inString.c_str() );
+#endif
+                if(inString.length() > 0)
+                    int_incarNumber = atoi( inString.c_str() );
+                
             }
+#ifdef DEBUG
             cout << "TEST:: <" << inString << "> (" << int_incarNumber << ")" <<  endl;
             cout << "\tIncarnation Number = " << int_incarNumber << endl;
+#endif
             ofstream outFile(filename.c_str() );
             outFile << (int_incarNumber + 1) << endl;
-            outFile.flush();
-
-            outFile.close();
-#ifdef BROKEN
-            if( incFile.good() ){
-            //incFile.seekg(0, ios::beg);
-            int linesRead=0;
-            while(incFile.good() ) {
-                string inString;
-                getline( incFile, inString);
-                cout << "Incarnation Number = <" << inString << ">" << endl;
-                if (inString.length() == 0)
-                    int_incarNumber = 100;
-                else
-                    int_incarNumber = atoi( inString.c_str() );
-                linesRead++;
-            }
-            cout << "Lines read = " << linesRead << endl;
-    #ifdef DEBUG
-            printf("getIncarnationNum:: int_incarNumber = %d\n", int_incarNumber);
-    #endif 
-    //        incFile << int_incarNumber++ << endl;
-
-            incFile.close();
-
-            cout << "\tIncarnation Number = " << int_incarNumber << endl;
-            ofstream outFile(filename.c_str() );
-            outFile << (int_incarNumber + 1) << endl;
-            outFile.flush();
-
             outFile.close();
 
-
-        }else{
-            cout << "EOF encountered" << endl;
-        }
-#endif
-        
-
-#else
-
-        if(input.fail()){
-            cout << "\nNo file matching \"" << filename << "\" exists\n";
-            cout.flush();
-        }else{
-            input.seekg(0,ios::beg); // seek to the beginning of the file
-            getline(input, str_incarNumber);
-
-            cout << str_incarNumber << endl;
-            if (str_incarNumber.length() == 0)
-                int_incarNumber = 68;
-            else
-                int_incarNumber = atoi(str_incarNumber.c_str());
-    #ifdef DEBUG
-            printf("getIncarnationNum:: int_incarNumber = %d\n", int_incarNumber);
-    #endif 
-            int_incarNumber++;
-            output << int_incarNumber << endl ; 
-            incFile.close();
-        }
-#endif
     pthread_mutex_unlock(&g_lock_incarnationFile);
-    return(int_incarNumber--);
+    return(int_incarNumber);
 }
 
 int main(int argc, char* argv[])//char  *argv[]
