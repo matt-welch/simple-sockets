@@ -84,19 +84,35 @@ int getIncarnationNum(void){
 #endif
     // lock file access, perform read & write new incarnation number to file
     pthread_mutex_lock(&g_lock_incarnationFile);
-        incFile.open(filename_cstr, ios::in | ios::out | ios::trunc );
+        //incFile.open(filename_cstr);
 #ifdef USEFSTREAM
         // open the file as a filestream
-        if( incFile.good() ){
-            incFile.seekg(0, ios::beg);
+            ifstream infile(filename_cstr);
+            string inString;
+            if(infile.good() ) {
+                getline(infile, inString);
+                cout << "Incarnation Number = <" << inString << ">" << endl;
+                int_incarNumber = atoi( inString.c_str() );
+            }
+            cout << "TEST:: <" << inString << "> (" << int_incarNumber << ")" <<  endl;
+            cout << "\tIncarnation Number = " << int_incarNumber << endl;
+            ofstream outFile(filename.c_str() );
+            outFile << (int_incarNumber + 1) << endl;
+            outFile.flush();
+
+            outFile.close();
+#ifdef BROKEN
+            if( incFile.good() ){
+            //incFile.seekg(0, ios::beg);
             int linesRead=0;
             while(incFile.good() ) {
-                getline( incFile, str_incarNumber);
-                cout << "Incarnation Number = <" << str_incarNumber << ">" << endl;
-                if (str_incarNumber.length() == 0)
+                string inString;
+                getline( incFile, inString);
+                cout << "Incarnation Number = <" << inString << ">" << endl;
+                if (inString.length() == 0)
                     int_incarNumber = 100;
                 else
-                    int_incarNumber = atoi( str_incarNumber.c_str() );
+                    int_incarNumber = atoi( inString.c_str() );
                 linesRead++;
             }
             cout << "Lines read = " << linesRead << endl;
@@ -108,16 +124,17 @@ int getIncarnationNum(void){
             incFile.close();
 
             cout << "\tIncarnation Number = " << int_incarNumber << endl;
-            ofstream outFile (filename.c_str() );
+            ofstream outFile(filename.c_str() );
             outFile << (int_incarNumber + 1) << endl;
             outFile.flush();
 
             outFile.close();
 
+
         }else{
             cout << "EOF encountered" << endl;
         }
-    
+#endif
         
 
 #else
