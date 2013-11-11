@@ -69,7 +69,7 @@ void DieWithError(const char *errorMessage) /* External error handling function 
 int getIncarnationNum(void){
     string filename = "incarnum";
 #ifdef USEFSTREAM
-    fstream incFile;
+    ifstream incFile;
 #else
     filebuf incFile;
     ostream output(&incFile);
@@ -87,11 +87,39 @@ int getIncarnationNum(void){
         incFile.open(filename_cstr, ios::in | ios::out | ios::trunc );
 #ifdef USEFSTREAM
         // open the file as a filestream
-        if( incFile.is_open() ){
-            getline( incFile, str_incarNumber);
-            cout << "Incarnation Number = " << str_incarNumber << endl;
+        if( incFile.good() ){
+            incFile.seekg(0, ios::beg);
+            int linesRead=0;
+            while(incFile.good() ) {
+                getline( incFile, str_incarNumber);
+                cout << "Incarnation Number = <" << str_incarNumber << ">" << endl;
+                if (str_incarNumber.length() == 0)
+                    int_incarNumber = 100;
+                else
+                    int_incarNumber = atoi( str_incarNumber.c_str() );
+                linesRead++;
+            }
+            cout << "Lines read = " << linesRead << endl;
+    #ifdef DEBUG
+            printf("getIncarnationNum:: int_incarNumber = %d\n", int_incarNumber);
+    #endif 
+    //        incFile << int_incarNumber++ << endl;
+
+            incFile.close();
+
+            cout << "\tIncarnation Number = " << int_incarNumber << endl;
+            ofstream outFile (filename.c_str() );
+            outFile << (int_incarNumber + 1) << endl;
+            outFile.flush();
+
+            outFile.close();
+
+        }else{
+            cout << "EOF encountered" << endl;
         }
-        incFile.close();
+    
+        
+
 #else
 
         if(input.fail()){
@@ -185,13 +213,14 @@ int main(int argc, char* argv[])//char  *argv[]
 	
 	//print our IP address
 	printf("IP address = %s\n", clientRequest.client_ip);
+    cout << endl;
 	int requestNum = 0;
 	/* build struct */
 	//clientRequest.client_ip = "129.219.102.8\0\0"
 	
 
 	clientRequest.client = 42;
-	for(requestNum = 0; requestNum < 20; ++requestNum)
+	for(requestNum = 0; requestNum < 5; ++requestNum)
 	{
 		clientRequest.req = requestNum + 1;
 		//TODO randomize the char sent to the server
@@ -210,6 +239,7 @@ int main(int argc, char* argv[])//char  *argv[]
 		if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
 					&echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
 			DieWithError("sendto() sent a different number of bytes than expected");
+        cout << endl;
 	}//end for
 
 
