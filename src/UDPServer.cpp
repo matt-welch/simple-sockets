@@ -36,9 +36,11 @@ void DieWithError(const char *errorMessage) /* External error handling function 
 }
 
 void updateClientString(char* myString, char c, int len){
-	for (int i = len-1; i > 0; i--) {
+    // function copies characters from left to right (0= left) so that the
+    // newer character may be placed in myString[0]
+	for (int i = len-1; i > 0; i--) {// terminates when i=1, copying myString[0] to myString[1]
 		myString[i] = myString[i-1];
-	}
+    }
 	myString[0] = c;
 	return;
 }
@@ -53,7 +55,8 @@ int main(int argc, char *argv[])
     char echoBuffer[ECHOMAX];        /* Buffer for echo string */
     unsigned short echoServPort;     /* Server port */
 	int recvMsgSize;                 /* Size of received message */
-	char* clientString = "      ";			 /* 5-element string belonging to the client */
+    const short strLen = 5;
+	char clientString[strLen+1] = "     ";			 /* 5-element string belonging to the client */
 
 	/* variables to contain data sent from client and the table of client data */
 	request_t clientRequest;
@@ -94,7 +97,7 @@ int main(int argc, char *argv[])
         printf("Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr));
 
 #ifdef DEBUG
-		printf("Cient Data::\n");
+		printf("Server:: received client data::\n");
 		printf("clientRequest.client_ip(char*)\t= %s\n", clientRequest.client_ip);
 		printf("clientRequest.inc (int)\t\t= %d\n", clientRequest.inc);
 		printf("clientRequest.client (int)\t= %d\n", clientRequest.client);
@@ -108,9 +111,10 @@ int main(int argc, char *argv[])
 		client_table_t::iterator it= clientTable.find(clientKey);
 		//TODO if the request is not already in the table, add it
 		//TODO modify the string stored with the client
-//		updateClientString(clientString, clientRequest.c, 5);
-		printf("New client string is %s \n", "");
-		
+		updateClientString(clientString, clientRequest.c, strLen);
+#ifdef DEBUG
+		printf("New client string is %s \n", clientString);
+#endif
 		/* copy client request data into the clientTable */
 
 

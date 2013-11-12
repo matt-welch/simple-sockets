@@ -72,7 +72,7 @@ int getIncarnationNum(void){
     int int_incarNumber=0;
 
 #ifdef DEBUG
-    printf("getIncarnationNum::About to open file \"%s\"\n",filename.c_str());
+    printf("getIncarnationNum():: About to open file \"%s\"\n",filename.c_str());
 #endif
     // lock file access, perform read & write new incarnation number to file
     pthread_mutex_lock(&g_lock_incarnationFile);
@@ -92,10 +92,6 @@ int getIncarnationNum(void){
                     int_incarNumber = atoi( inString.c_str() );
                 
             }
-#ifdef DEBUG
-            cout << "TEST:: <" << inString << "> (" << int_incarNumber << ")" <<  endl;
-            cout << "\tIncarnation Number = " << int_incarNumber << endl;
-#endif
             ofstream outFile(filename.c_str() );
             outFile << (int_incarNumber + 1) << endl;
             outFile.close();
@@ -178,7 +174,7 @@ int main(int argc, char* argv[])//char  *argv[]
 	
 
 	clientRequest.client = 42;
-	for(requestNum = 0; requestNum < 5; ++requestNum)
+	for(requestNum = 0; requestNum < 20; ++requestNum)
 	{
 		clientRequest.req = requestNum + 1;
 		//TODO randomize the char sent to the server
@@ -190,8 +186,12 @@ int main(int argc, char* argv[])//char  *argv[]
         // closing file
         clientRequest.inc = getIncarnationNum();
 #ifdef DEBUG
-        printf("clientRequest.inc = %d \n", clientRequest.inc);
-        printf("Client :: sending request #%d\n", clientRequest.req);
+		printf("Client:: sending client data::\n");
+		printf("clientRequest.client_ip(char*)\t= %s\n", clientRequest.client_ip);
+		printf("clientRequest.inc (int)\t\t= %d\n", clientRequest.inc);
+		printf("clientRequest.client (int)\t= %d\n", clientRequest.client);
+		printf("clientRequest.req (int\t)\t= %d\n", clientRequest.req);
+		printf("clientRequest.c (char)\t\t= %c\n\n", clientRequest.c);
 #endif
 		/* Send the string to the server */
 		if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
