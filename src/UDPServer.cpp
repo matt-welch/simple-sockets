@@ -26,6 +26,14 @@
 #include <unistd.h>     /* for close() */
 #include "UDPServer.hpp" // server header file 
 
+#include <sstream>
+using std::stringstream;
+
+#include <iostream>
+using std::cout;
+using std::endl;
+using std::cin;
+
 #define DEBUG 1
 #define ECHOMAX 255     /* Longest string to echo */
 
@@ -57,6 +65,7 @@ int main(int argc, char *argv[])
 	int recvMsgSize;                 /* Size of received message */
     const short strLen = 5;
 	char clientString[strLen+1] = "     ";			 /* 5-element string belonging to the client */
+    stringstream keyStream;
 
 	/* variables to contain data sent from client and the table of client data */
 	request_t clientRequest;
@@ -94,26 +103,42 @@ int main(int argc, char *argv[])
 						0,(struct sockaddr *) &echoClntAddr, &cliAddrLen)) < 0)
             DieWithError("recvfrom() failed");
 
-        printf("Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr));
-
 #ifdef DEBUG
+        printf("Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr));
 		printf("Server:: received client data::\n");
 		printf("clientRequest.client_ip(char*)\t= %s\n", clientRequest.client_ip);
 		printf("clientRequest.inc (int)\t\t= %d\n", clientRequest.inc);
 		printf("clientRequest.client (int)\t= %d\n", clientRequest.client);
 		printf("clientRequest.req (int\t)\t= %d\n", clientRequest.req);
-		printf("clientRequest.c (char)\t\t= %c\n\n", clientRequest.c);
+		printf("clientRequest.c (char)\t\t= %c\n", clientRequest.c);
 #endif
 		// TODO assemble the clientKey string from the components of the
 		// clients request
-		string clientKey = "";
+        keyStream.str(""); // clear the key 
+        // assemble the key
+        keyStream << clientRequest.client_ip << "_" << clientRequest.client << "_"
+            << clientRequest.inc;
+#ifdef DEBUG
+        cout << "ClientKey = " << keyStream.str() << endl;
+#endif
+		//string clientKey = keyStream.str();;
 		/* determine if the clientTable already has data from this client */
-		client_table_t::iterator it= clientTable.find(clientKey);
+		client_table_t::iterator table_it= clientTable.find(keyStream.str());
+
 		//TODO if the request is not already in the table, add it
-		//TODO modify the string stored with the client
+        if(table_it == clientTable.end()) {
+//            client_data_t clientVector;
+//            clientVector[0] = clientRequest;
+//            clientTable.insert(keyStream.str(), clientVector);
+        }else{
+            // lookup the client data in the table and add the new request
+        }
+        
+
+		// modify the string stored with the client
 		updateClientString(clientString, clientRequest.c, strLen);
 #ifdef DEBUG
-		printf("New client string is %s \n", clientString);
+		printf("New client string is %s\n\n", clientString);
 #endif
 		/* copy client request data into the clientTable */
 
