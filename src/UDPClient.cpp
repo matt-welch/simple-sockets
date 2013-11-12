@@ -146,6 +146,8 @@ int main(int argc, char* argv[])//char  *argv[]
       echoServAddr.sin_port   = htons(echoServPort);     /* Server port */
 
 	//------- get IP ----------- // should be a function
+	//*** maybe use getpeername to get info like IP from socket
+	//I will check into it soon : http://support.sas.com/documentation/onlinedoc/sasc/doc700/html/lr2/zeername.htm
 	int socketDescriptor;//
 	struct ifreq interface;
 	
@@ -154,7 +156,7 @@ int main(int argc, char* argv[])//char  *argv[]
 	//get IPv4 address ################################################
 	interface.ifr_addr.sa_family = AF_INET;
 	
-	//get address attached to eth0
+	//get address attached to eth0 
 	strncpy(interface.ifr_name, "p4p1", IFNAMSIZ-1);
 	
 	ioctl(socketDescriptor, SIOCGIFADDR, &interface);
