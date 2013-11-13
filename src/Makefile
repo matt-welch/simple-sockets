@@ -24,7 +24,12 @@ clean:
 tidy: clean
 	rm -f *.*~ *~
 
+
+DEBUG_FLAGS = -g3 -ggdb -O0 -Wall -pedantic -DDEBUG
 CONFIG		= -Wall -pedantic
+
+debug: CONFIG=$(DEBUG_FLAGS)
+debug: client server
 
 run: server client
 	./server 65432

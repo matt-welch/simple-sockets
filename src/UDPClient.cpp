@@ -51,7 +51,8 @@ using std::string;
 #include <pthread.h>  /* for mutex lock on file access */
 
 #define USEFSTREAM
-#define DEBUG 1
+#define SHOWERRORS 1
+//#define DEBUG 1
 #define ECHOMAX 255     /* Longest string to echo */
 //-----------------------------------------------------
 
@@ -78,10 +79,14 @@ int getValueFromFile(string filename){
     if( infile.fail() ) {
         cout << "No file <" << filename << "> found; creating file with incarnation number = 0" 
             << endl;
+        // create the file because it does not yet exist and fill it with a 0
+        ofstream outFile(filename.c_str() );
+        outFile << (int_incarNumber ) << endl;
+        outFile.close();
     }else{
         getline(infile, inString);
 #ifdef DEBUG
-        cout << "Incarnation Number = <" << inString << ">" << endl;
+        cout << "getValueFromFile():: incarnation number found = <" << inString << ">" << endl;
 #endif
         if(inString.length() > 0)
             int_incarNumber = atoi( inString.c_str() );
@@ -108,20 +113,20 @@ int updateIncarNum(void){
     string str_incarNumber;
     int int_incarNumber=0;
 
-#ifdef DEBUG
-    printf("updateIncarNum():: About to open file \"%s\"\n",filename.c_str());
-#endif
     // lock file access, perform read & write new incarnation number to file
     //pthread_mutex_lock(&g_lock_incarnationFile);
     // open the file as a filestream
-    int_incarNumber = getValueFromFile(filename);
+    // since this is the failure mode, increment the incarnation number 
+    int_incarNumber = getValueFromFile(filename) + 1;
 #ifdef UNUSED
     ifstream infile( filename.c_str() );
     string inString;
 
     if( infile.fail() ) {
+#if SHOWERRORS
         cout << "No file <" << filename << "> found; creating file with incarnation number = 0" 
             << endl;
+#endif // SHOWERRORS
     }else{
         getline(infile, inString);
 #ifdef DEBUG
@@ -134,7 +139,7 @@ int updateIncarNum(void){
 #endif //UNUSED     
     // update the incarnation number to the new value
     ofstream outFile(filename.c_str() );
-    outFile << (int_incarNumber + 1) << endl;
+    outFile << (int_incarNumber ) << endl;
     outFile.close();
 
     //pthread_mutex_unlock(&g_lock_incarnationFile);
@@ -147,7 +152,10 @@ int main(int argc, char* argv[])//char  *argv[]
     struct sockaddr_in echoServAddr; /* Echo server address */
     unsigned short echoServPort;     /* Echo server port */
     char *servIP;                    /* IP address of server */
-    
+    const int MAX_REQUESTS = 20;     /* maximum number of client requests */
+	int requestNum = 0;              /* iterator variable for requests loop */
+    int failurePoint;                /* the iteration at which failures may begin */
+    float failureProbability = 0.0;  /* probability of failure past failurePoint */
 #ifdef RCV_FROM_SERVER  
     unsigned int fromSize;           /* In-out of address size for recvfrom() */
     struct sockaddr_in fromAddr;     /* Source address of echo */
@@ -209,38 +217,68 @@ int main(int argc, char* argv[])//char  *argv[]
 	//print our IP address
 	printf("IP address = %s\n", clientRequest.client_ip);
     cout << endl;
-	int requestNum = 0;
+    failurePoint = rand() % (MAX_REQUESTS) ; // the iteration at which failures wil begin with a probability of 50%
+    cout << "Client number " << clientNum << " will fail at iteration " << failurePoint+1 << endl;
+ 
 	/* build struct */
 	//clientRequest.client_ip = "129.219.102.8\0\0"
 	
 
 	clientRequest.client = clientNum;
-	for(requestNum = 0; requestNum < 20; ++requestNum)
+	for(requestNum = 0; requestNum < MAX_REQUESTS ; ++requestNum)
 	{
-		clientRequest.req = requestNum + 1;
-		//TODO randomize the char sent to the server
-		clientRequest.c   = (char) 97 + requestNum; // 97 == ascii "a"
-
-		//TODO simulate failure modes of client
+		clientRequest.req = requestNum+1;
+		// randomize the char sent to the server
+		clientRequest.c   = (char) ( 97 + (rand() % 26) ); // 97 == ascii "a"
 
 
+
+		// simulate failure modes of client
+        // update the incarnation number if past the point of failure
         // get incarnation number by unlocking file, incrementing, and
         // closing file
-        clientRequest.inc = updateIncarNum();
+        if((requestNum) >= failurePoint){
+            // randomly calculate the failureProbability for each iteration 
+            // past the failure point (0 to 1) 
+            failureProbability = (float) rand() / (float) RAND_MAX;
+#ifdef DEBUG
+            cout << "Failure Probability = " << failureProbability; 
+#endif
+            if(failureProbability > 0.5){   
+                // failure occured, increment the current incarnation
+#ifdef DEBUG
+                cout << " --> FAILURE!! " << endl;
+#endif
+                clientRequest.inc = updateIncarNum();
+            }else{
+                // failure did not happen, just get the current incarnation
+                // number
+#ifdef DEBUG
+                cout << " --> SUCCESS!! " << endl;
+#endif
+                clientRequest.inc = checkIncarNum();
+            }
+        }else{
+            // no failures yet, just check that nobody else has updated it
+            clientRequest.inc = checkIncarNum();
+        }
+
+        
 #ifdef DEBUG
 		printf("Client:: sending client data::\n");
 		printf("clientRequest.client_ip(char*)\t= %s\n", clientRequest.client_ip);
 		printf("clientRequest.inc (int)\t\t= %d\n", clientRequest.inc);
 		printf("clientRequest.client (int)\t= %d\n", clientRequest.client);
-		printf("clientRequest.req (int\t)\t= %d\n", clientRequest.req);
+		printf("clientRequest.req (int)\t\t= %d\n", clientRequest.req);
 		printf("clientRequest.c (char)\t\t= %c\n\n", clientRequest.c);
 #endif
 		/* Send the string to the server */
 		if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
 					&echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
 			DieWithError("sendto() sent a different number of bytes than expected");
+#ifdef DEBUG
         cout << endl;
-
+#endif
         // need to receive a response form the server to verify the packet was
         // received??
 	}//end for
@@ -267,5 +305,6 @@ int main(int argc, char* argv[])//char  *argv[]
 #endif // RCV_FROM_SERVER
 
     close(sock);
+    cout << "Client Program terminated. " << endl;
     exit(0);
 }//end main
