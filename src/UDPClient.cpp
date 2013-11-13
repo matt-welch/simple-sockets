@@ -64,39 +64,80 @@ void DieWithError(const char *errorMessage) /* External error handling function 
     exit(1);
 }
 
+int getValueFromFile(string filename){
+    // open the file as a filestream
+    // lock file access here
+    ifstream infile( filename.c_str() );
+    string inString;
+    int int_incarNumber=0;
+
+// open the file for read-only access
+#ifdef DEBUG
+    printf("getValueFromFile():: About to open file \"%s\"\n",filename.c_str());
+#endif
+    if( infile.fail() ) {
+        cout << "No file <" << filename << "> found; creating file with incarnation number = 0" 
+            << endl;
+    }else{
+        getline(infile, inString);
+#ifdef DEBUG
+        cout << "Incarnation Number = <" << inString << ">" << endl;
+#endif
+        if(inString.length() > 0)
+            int_incarNumber = atoi( inString.c_str() );
+    }
+    return int_incarNumber;
+}
+
+// function to check on the incarnation number.  If it is different than the
+// currently held number, call updateIncarNum() and return the updated value.
+int checkIncarNum(void){
+    string filename = "inc.txt";
+    string str_incarNumber;
+    int int_incarNumber=0;
+    int_incarNumber = getValueFromFile(filename);
+
+// return file value for inc always
+    return(int_incarNumber);
+}
+
+// the number 
 // function unlocks file containing last incarnation number and gets a new
-// number for the client after a failure
-int getIncarnationNum(void){
-    string filename = "incarnum";
+int updateIncarNum(void){
+    string filename = "inc.txt";
     string str_incarNumber;
     int int_incarNumber=0;
 
 #ifdef DEBUG
-    printf("getIncarnationNum():: About to open file \"%s\"\n",filename.c_str());
+    printf("updateIncarNum():: About to open file \"%s\"\n",filename.c_str());
 #endif
     // lock file access, perform read & write new incarnation number to file
-    pthread_mutex_lock(&g_lock_incarnationFile);
-        // open the file as a filestream
-            ifstream infile( filename.c_str() );
-            string inString;
+    //pthread_mutex_lock(&g_lock_incarnationFile);
+    // open the file as a filestream
+    int_incarNumber = getValueFromFile(filename);
+#ifdef UNUSED
+    ifstream infile( filename.c_str() );
+    string inString;
 
-            if( infile.fail() ) {
-                cout << "No file <" << filename << "> found; creating file with incarnation number = 0" 
-                    << endl;
-            }else{
-                getline(infile, inString);
+    if( infile.fail() ) {
+        cout << "No file <" << filename << "> found; creating file with incarnation number = 0" 
+            << endl;
+    }else{
+        getline(infile, inString);
 #ifdef DEBUG
-                cout << "Incarnation Number = <" << inString << ">" << endl;
+        cout << "Incarnation Number = <" << inString << ">" << endl;
 #endif
-                if(inString.length() > 0)
-                    int_incarNumber = atoi( inString.c_str() );
-                
-            }
-            ofstream outFile(filename.c_str() );
-            outFile << (int_incarNumber + 1) << endl;
-            outFile.close();
+        if(inString.length() > 0)
+            int_incarNumber = atoi( inString.c_str() );
 
-    pthread_mutex_unlock(&g_lock_incarnationFile);
+    }
+#endif //UNUSED     
+    // update the incarnation number to the new value
+    ofstream outFile(filename.c_str() );
+    outFile << (int_incarNumber + 1) << endl;
+    outFile.close();
+
+    //pthread_mutex_unlock(&g_lock_incarnationFile);
     return(int_incarNumber);
 }
 
@@ -104,36 +145,34 @@ int main(int argc, char* argv[])//char  *argv[]
 {
     int sock;                        /* Socket descriptor */
     struct sockaddr_in echoServAddr; /* Echo server address */
-    struct sockaddr_in fromAddr;     /* Source address of echo */
     unsigned short echoServPort;     /* Echo server port */
-    unsigned int fromSize;           /* In-out of address size for recvfrom() */
     char *servIP;                    /* IP address of server */
+    
+#ifdef RCV_FROM_SERVER  
+    unsigned int fromSize;           /* In-out of address size for recvfrom() */
+    struct sockaddr_in fromAddr;     /* Source address of echo */
     char *echoString;                /* String to send to echo server */
     char echoBuffer[ECHOMAX+1];      /* Buffer for receiving echoed string */
     int echoStringLen;               /* Length of string to echo */
     int respStringLen;               /* Length of received response */
+#endif // RCV_FROM_SERVER
 
+    int clientNum;                   /* client number, passed in as a command line argument */
 	request_t clientRequest; //new reques
 
 	/* random seed */
 	srand(time(NULL));
 
+    // parse command line arguments
     if ((argc < 3) || (argc > 4))    /* Test for correct number of arguments */
     {
-        fprintf(stderr,"Usage: %s <Server IP> <Echo Word> [<Echo Port>]\n", argv[0]);
+        fprintf(stderr,"Usage: %s <Server IP> <Server Port> <ClientNumber>\n", argv[0]);
         exit(1);
     }
-
     servIP = argv[1];           /* First arg: server IP address (dotted quad) */
-    echoString = argv[2];       /* Second arg: string to echo */
-
-    if ((echoStringLen = strlen(echoString)) > ECHOMAX)  /* Check input length */
-        DieWithError("Echo word too long");
-
-    if (argc == 4)
-        echoServPort = atoi(argv[3]);  /* Use given port, if any */
-    else
-        echoServPort = 7;  /* 7 is the well-known port for the echo service */
+    echoServPort = atoi(argv[2]);  /* Use given port */
+    //echoServPort = 65432;  /* experimental port range port as default */
+    clientNum = atoi(argv[3]); 
 
     /* Create a datagram/UDP socket */
     if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
@@ -175,7 +214,7 @@ int main(int argc, char* argv[])//char  *argv[]
 	//clientRequest.client_ip = "129.219.102.8\0\0"
 	
 
-	clientRequest.client = 42;
+	clientRequest.client = clientNum;
 	for(requestNum = 0; requestNum < 20; ++requestNum)
 	{
 		clientRequest.req = requestNum + 1;
@@ -184,9 +223,10 @@ int main(int argc, char* argv[])//char  *argv[]
 
 		//TODO simulate failure modes of client
 
+
         // get incarnation number by unlocking file, incrementing, and
         // closing file
-        clientRequest.inc = getIncarnationNum();
+        clientRequest.inc = updateIncarNum();
 #ifdef DEBUG
 		printf("Client:: sending client data::\n");
 		printf("clientRequest.client_ip(char*)\t= %s\n", clientRequest.client_ip);
@@ -200,12 +240,15 @@ int main(int argc, char* argv[])//char  *argv[]
 					&echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
 			DieWithError("sendto() sent a different number of bytes than expected");
         cout << endl;
+
+        // need to receive a response form the server to verify the packet was
+        // received??
 	}//end for
 
 
 
 
-
+#ifdef RCV_FROM_SERVER
     /* Recv a response */
     fromSize = sizeof(fromAddr);
     if ((respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
@@ -221,8 +264,8 @@ int main(int argc, char* argv[])//char  *argv[]
     /* null-terminate the received data */
     echoBuffer[respStringLen] = '\0';
     printf("Received: %s\n", echoBuffer);    /* Print the echoed arg */
+#endif // RCV_FROM_SERVER
 
     close(sock);
     exit(0);
-    return (0);
 }//end main

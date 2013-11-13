@@ -18,7 +18,7 @@ UDPClient.o: UDPClient.cpp request.hpp
 	g++ -c $(CONFIG) UDPClient.cpp  request.hpp
 
 clean:
-	rm -f server client incarnum *.o core core.* *.gch
+	rm -f server client inc.txt *.o core core.* *.gch
 	ctags --c-kinds=+defglmpstux -R
 
 tidy: clean
