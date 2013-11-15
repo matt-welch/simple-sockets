@@ -1,4 +1,4 @@
-* **************************************************************************
+/* **************************************************************************
  * FILENAME:    UDPServer.cpp
  * NAME:        UDP Simple Sockets server program
  * AUTHORS:     Jesse Quale, Matt Welch
@@ -102,19 +102,16 @@ int main(int argc, char *argv[])
 	int recvMsgSize;                 /* Size of received message */
 	char clientString[strLen+1] = "     ";	 /* 5-element string belonging to the client */
     stringstream clientKey;
-<<<<<<< HEAD
     client_data_t clientVector;
     string newString;
-=======
 	int failureProbability = 0;
 
 	/* random seed */
     srand(time(NULL));
->>>>>>> f6febacb46ec41983a7c1fad3e58dd23a64263df
 
 	/* variables to contain data sent from client and the table of client data */
 	request_t clientRequest;
-	client_table_t clientTable
+	client_table_t clientTable;
     if (argc != 2)         /* Test for correct number of parameters */
     {
         fprintf(stderr,"Usage:  %s <UDP SERVER PORT>\n", argv[0]);
