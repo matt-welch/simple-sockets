@@ -7,8 +7,10 @@ using std::vector;
 using std::map;
 using std::string;
 
-typedef vector< request_t > client_data_t;
+// client_data is a vector of the last few strings that the server has updated 
+typedef vector< string > client_data_t;
 
+// client_table is a map of the client key to a vector of strings
 typedef map< string, client_data_t > client_table_t;
 
 

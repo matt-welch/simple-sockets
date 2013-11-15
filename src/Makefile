@@ -31,6 +31,5 @@ CONFIG		= -Wall -pedantic
 debug: CONFIG=$(DEBUG_FLAGS)
 debug: client server
 
-run: server client
-	/sbin/ifconfig | grep "inet addr"
+run: debug server client
 	./server 65432

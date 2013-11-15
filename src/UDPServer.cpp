@@ -35,12 +35,60 @@ using std::endl;
 using std::cin;
 
 #define DEBUG 1
-//#define STORE_CLIENT_DATA 1
+#define STORE_CLIENT_DATA 1
+#define STORE_WITH_FUNCTION
 
 void DieWithError(const char *errorMessage) /* External error handling function */
 {
     perror(errorMessage);
     exit(1);
+}
+
+string storeClientData( client_table_t& clientTable, request_t& clientRequest){
+    string newString;
+    client_data_t clientVector;
+    stringstream clientKey;
+	char clientString[strLen+1] = "     ";			 /* 5-element string belonging to the client */
+
+    // assemble the client key string from the components of the clients request
+    clientKey.str(""); // clear the key 
+    // assemble the key
+    clientKey << clientRequest.client_ip << "_" << clientRequest.client << "_"
+        << clientRequest.inc;
+#ifdef DEBUG
+    cout << "ClientKey = " << clientKey.str() << endl;
+#endif
+
+    /* determine if the clientTable already has data from this client */
+    client_table_t::iterator table_it= clientTable.find(clientKey.str());
+
+    if(table_it == clientTable.end()) {// no entry found, create new
+#ifdef DEBUG
+        cout << "Client key <" << clientKey.str() << 
+            "> not found in the table, creating new entry:" << 
+            "< " << clientKey.str() << ", '" << clientRequest.c << "' >" << endl;
+#endif
+        // clear clientVector to create a new vector of client data
+        clientVector.clear();
+        // copy in the new string (one character)
+        newString = clientRequest.c;
+    }else{// client data found, get it from the table and add the new string
+        // get the client data from the table
+        // TODO: this step may be redundant since we just looked up the
+        // iterator
+        clientVector = table_it->second; //clientTable[clientKey.str()];
+        // copy the last string from the table to the client String
+        strcpy(clientString, clientVector.back().c_str());
+        // modify the string stored with the client
+        updateClientString(clientString, clientRequest.c, strLen);
+        // create a new string to add to the client data
+        newString = clientString;
+    }
+    // push the updated string onto the client data
+    clientVector.push_back(newString);
+    // update the client table with new string
+    clientTable[clientKey.str()] = clientVector;
+    return newString; 
 }
 
 int main(int argc, char *argv[])
@@ -54,6 +102,8 @@ int main(int argc, char *argv[])
 	int recvMsgSize;                 /* Size of received message */
 	char clientString[strLen+1] = "     ";			 /* 5-element string belonging to the client */
     stringstream clientKey;
+    client_data_t clientVector;
+    string newString;
 
 	/* variables to contain data sent from client and the table of client data */
 	request_t clientRequest;
@@ -66,6 +116,9 @@ int main(int argc, char *argv[])
     }
 
     echoServPort = atoi(argv[1]);  /* First arg:  local port */
+
+    /* display the server's IP address  */
+    cout << "Server is running at " << getSocketIP() << ":" << echoServPort << endl;
 
     /* Create socket for sending/receiving datagrams */
     if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
@@ -101,8 +154,13 @@ int main(int argc, char *argv[])
 		printf("clientRequest.req (int\t)\t= %d\n", clientRequest.req);
 		printf("clientRequest.c (char)\t\t= %c\n", clientRequest.c);
 #endif
-		// TODO assemble the client key string from the components of the
-		// clients request
+
+#ifdef STORE_WITH_FUNCTION
+    newString = storeClientData(clientTable, clientRequest);
+    strcpy(clientString, newString.c_str() );
+    
+#else // STORE_WITH_FUNCTION
+        // assemble the client key string from the components of the clients request
         clientKey.str(""); // clear the key 
         // assemble the key
         clientKey << clientRequest.client_ip << "_" << clientRequest.client << "_"
@@ -110,34 +168,46 @@ int main(int argc, char *argv[])
 #ifdef DEBUG
         cout << "ClientKey = " << clientKey.str() << endl;
 #endif
-		// modify the string stored with the client
-		updateClientString(clientString, clientRequest.c, strLen);
-#ifdef DEBUG
-		printf("New client string is %s\n", clientString);
-#endif
 
-#ifdef STORE_CLIENT_DATA
-		/* TODO: copy client request data into the clientTable */
+#if STORE_CLIENT_DATA
 		/* determine if the clientTable already has data from this client */
 		client_table_t::iterator table_it= clientTable.find(clientKey.str());
 
-		//TODO if the request is not already in the table, add it
-        if(table_it == clientTable.end()) {
+        if(table_it == clientTable.end()) {// no entry found, create new
     #ifdef DEBUG
             cout << "Client key <" << clientKey.str() << 
-                "> not found in the table, creating new entry." << endl;
+                "> not found in the table, creating new entry:" << 
+                "< " << clientKey.str() << ", '" << clientRequest.c << "' >" << endl;
     #endif
-            client_data_t clientVector;
-            clientVector[0] = clientRequest;
-//           const string clientKeyString = clientKey.str();
-//            clientTable.insert(clientKeyString, clientVector);
-//            clientTable[clientKey.str()] = clientVector;
-        }else{
-            // lookup the client data in the table and add the new request
-//            client_data_t clientVector = 
-
+            // clear clientVector to create a new vector of client data
+            clientVector.clear();
+            // copy in the new string (one character)
+            newString = clientRequest.c;
+        }else{// client data found, get it from the table and add the new string
+            // get the client data from the table
+            // TODO: this step may be redundant since we just looked up the
+            // iterator
+            clientVector = table_it->second; //clientTable[clientKey.str()];
+            // copy the last string from the table to the client String
+            strcpy(clientString, clientVector.back().c_str());
+            // modify the string stored with the client
+            updateClientString(clientString, clientRequest.c, strLen);
+            // create a new string to add to the client data
+            newString = clientString;
         }
+        // push the updated string onto the client data
+        clientVector.push_back(newString);
+        // update the client table with new string
+        clientTable[clientKey.str()] = clientVector;
+#else
+		// modify the string stored with the client
+		updateClientString(clientString, clientRequest.c, strLen);
 #endif // STORE_CLIENT_DATA
+
+#endif // STORE_WITH_FUNCTION
+#ifdef DEBUG
+		printf("New client string is %s\n", clientString);
+#endif
 
 #ifdef ACK_TO_CLIENT
         /* Send current client string back to the client */

@@ -155,6 +155,7 @@ int main(int argc, char* argv[])//char  *argv[]
 	int requestNum = 0;              /* iterator variable for requests loop */
     int failurePoint;                /* the iteration at which failures may begin */
     float failureProbability = 0.0;  /* probability of failure past failurePoint */
+    const float chanceOfFailure = 0.5; 
 #ifdef ACK_TO_CLIENT  
     unsigned int fromSize;           /* In-out of address size for recvfrom() */
     struct sockaddr_in fromAddr;     /* Source address of echo */
@@ -247,12 +248,14 @@ int main(int argc, char* argv[])//char  *argv[]
 #ifdef DEBUG
             cout << "Failure Probability = " << failureProbability; 
 #endif
-            if(failureProbability > 0.5){   
-                // failure occured, increment the current incarnation
+            if(failureProbability < chanceOfFailure){   
 #ifdef DEBUG
                 cout << " --> FAILURE!! " << endl;
 #endif
+                // failure occured, increment the current incarnation
                 clientRequest.inc = updateIncarNum();
+                // reset the client string to empty 5 char
+                strcpy(clientString, "     ");
             }else{
                 // failure did not happen, just get the current incarnation
                 // number
