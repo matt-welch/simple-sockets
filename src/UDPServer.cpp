@@ -1,4 +1,4 @@
-/* **************************************************************************
+* **************************************************************************
  * FILENAME:    UDPServer.cpp
  * NAME:        UDP Simple Sockets server program
  * AUTHORS:     Jesse Quale, Matt Welch
@@ -16,7 +16,7 @@
  * the client requests so that it can resend responses and service requests
  * based on simulated failure modes of both the client and the server.  The
  * algorithm of this eschange is more fully described in the README.MD.  
- * */
+ **************************************************************************** */
 
 #include <stdio.h>      /* for printf() and fprintf() */
 #include <sys/socket.h> /* for socket() and bind() */
@@ -100,21 +100,27 @@ int main(int argc, char *argv[])
 //    char echoBuffer[ECHOMAX];        /* Buffer for echo string */
     unsigned short echoServPort;     /* Server port */
 	int recvMsgSize;                 /* Size of received message */
-	char clientString[strLen+1] = "     ";			 /* 5-element string belonging to the client */
+	char clientString[strLen+1] = "     ";	 /* 5-element string belonging to the client */
     stringstream clientKey;
+<<<<<<< HEAD
     client_data_t clientVector;
     string newString;
+=======
+	int failureProbability = 0;
+
+	/* random seed */
+    srand(time(NULL));
+>>>>>>> f6febacb46ec41983a7c1fad3e58dd23a64263df
 
 	/* variables to contain data sent from client and the table of client data */
 	request_t clientRequest;
-	client_table_t clientTable;
-
+	client_table_t clientTable
     if (argc != 2)         /* Test for correct number of parameters */
     {
         fprintf(stderr,"Usage:  %s <UDP SERVER PORT>\n", argv[0]);
         exit(1);
     }
-
+	
     echoServPort = atoi(argv[1]);  /* First arg:  local port */
 
     /* display the server's IP address  */
@@ -133,9 +139,13 @@ int main(int argc, char *argv[])
     /* Bind to the local address */
     if (bind(sock, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) < 0)
         DieWithError("bind() failed");
-  
+
     for (;;) /* Run forever */
     {
+        // randomly calculate the failureProbability for each iteration 
+        // past the failure point (0 to 10) 
+        failureProbability = rand() % 10;
+
         /* Set the size of the in-out parameter */
         cliAddrLen = sizeof(echoClntAddr);
 
@@ -143,7 +153,26 @@ int main(int argc, char *argv[])
         if ((recvMsgSize = recvfrom(sock, &clientRequest, sizeof(request_t), 
 						0,(struct sockaddr *) &echoClntAddr, &cliAddrLen)) < 0)
             DieWithError("recvfrom() failed");
+//fail 1 do nothing
+//fail 2 add data to table but no send response
+		int fp = failureProbability;
 
+		if(fp > 2)
+		{
+		//do right thing
+
+		}
+		else if(fp > 0 && fp <= 1)
+		{
+		//add data to table but no response		
+
+		}
+		else if(fp > 1 && fp <= 2)
+		{
+		//do nothing
+			continue;
+		}
+			
 #ifdef DEBUG
         printf( "Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr) );
 
