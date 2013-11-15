@@ -53,7 +53,6 @@ using std::string;
 #define USEFSTREAM
 #define SHOWERRORS 1
 //#define DEBUG 1
-#define ECHOMAX 255     /* Longest string to echo */
 //-----------------------------------------------------
 
 // lock for accessing the incarnation file
@@ -156,14 +155,14 @@ int main(int argc, char* argv[])//char  *argv[]
 	int requestNum = 0;              /* iterator variable for requests loop */
     int failurePoint;                /* the iteration at which failures may begin */
     float failureProbability = 0.0;  /* probability of failure past failurePoint */
-#ifdef RCV_FROM_SERVER  
+#ifdef ACK_TO_CLIENT  
     unsigned int fromSize;           /* In-out of address size for recvfrom() */
     struct sockaddr_in fromAddr;     /* Source address of echo */
-    char *echoString;                /* String to send to echo server */
+	char clientString[strLen+1] = "     "; /* 5-element string belonging to the client */
     char echoBuffer[ECHOMAX+1];      /* Buffer for receiving echoed string */
-    int echoStringLen;               /* Length of string to echo */
+    int echoStringLen = strLen+1;               /* Length of string to echo */
     int respStringLen;               /* Length of received response */
-#endif // RCV_FROM_SERVER
+#endif // ACK_TO_CLIENT
 
     int clientNum;                   /* client number, passed in as a command line argument */
 	request_t clientRequest; //new reques
@@ -270,39 +269,44 @@ int main(int argc, char* argv[])//char  *argv[]
 		printf("clientRequest.inc (int)\t\t= %d\n", clientRequest.inc);
 		printf("clientRequest.client (int)\t= %d\n", clientRequest.client);
 		printf("clientRequest.req (int)\t\t= %d\n", clientRequest.req);
-		printf("clientRequest.c (char)\t\t= %c\n\n", clientRequest.c);
+		printf("clientRequest.c (char)\t\t= %c\n", clientRequest.c);
 #endif
 		/* Send the string to the server */
 		if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
 					&echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
 			DieWithError("sendto() sent a different number of bytes than expected");
+		// modify the string stored with the client
+		updateClientString(clientString, clientRequest.c, strLen);
+#ifdef DEBUG  //"String Received from server: "
+        cout << "Client string (stored by client):\t" << clientString <<  endl;
+#endif
+
+        // need to receive a response form the server to verify the packet was
+        // received??
+#ifdef ACK_TO_CLIENT
+        /* Recv a response */
+        fromSize = sizeof(fromAddr);
+        if ((respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
+                        (struct sockaddr *) &fromAddr, &fromSize)) != echoStringLen)
+            DieWithError("recvfrom() failed");
+
+        if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr)
+        {
+            fprintf(stderr,"Error: received a packet from unknown source.\n");
+            exit(1);
+        }
+
+        /* null-terminate the received data */
+        echoBuffer[respStringLen] = '\0';
+        printf("String Received from server:\t\t%s\n", echoBuffer);    /* Print the echoed arg */
+#endif // ACK_TO_CLIENT
+
+
+
 #ifdef DEBUG
         cout << endl;
 #endif
-        // need to receive a response form the server to verify the packet was
-        // received??
 	}//end for
-
-
-
-
-#ifdef RCV_FROM_SERVER
-    /* Recv a response */
-    fromSize = sizeof(fromAddr);
-    if ((respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
-         (struct sockaddr *) &fromAddr, &fromSize)) != echoStringLen)
-        DieWithError("recvfrom() failed");
-
-    if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr)
-    {
-        fprintf(stderr,"Error: received a packet from unknown source.\n");
-        exit(1);
-    }
-
-    /* null-terminate the received data */
-    echoBuffer[respStringLen] = '\0';
-    printf("Received: %s\n", echoBuffer);    /* Print the echoed arg */
-#endif // RCV_FROM_SERVER
 
     close(sock);
     cout << "Client Program terminated. " << endl;

@@ -32,4 +32,5 @@ debug: CONFIG=$(DEBUG_FLAGS)
 debug: client server
 
 run: server client
+	/sbin/ifconfig | grep "inet addr"
 	./server 65432

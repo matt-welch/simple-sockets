@@ -35,7 +35,6 @@ using std::endl;
 using std::cin;
 
 #define DEBUG 1
-#define ECHOMAX 255     /* Longest string to echo */
 
 void DieWithError(const char *errorMessage) /* External error handling function */
 {
@@ -43,27 +42,15 @@ void DieWithError(const char *errorMessage) /* External error handling function 
     exit(1);
 }
 
-void updateClientString(char* myString, char c, int len){
-    // function copies characters from left to right (0= left) so that the
-    // newer character may be placed in myString[0]
-	for (int i = len-1; i > 0; i--) {// terminates when i=1, copying myString[0] to myString[1]
-		myString[i] = myString[i-1];
-    }
-	myString[0] = c;
-	return;
-}
-
-
 int main(int argc, char *argv[])
 {
     int sock;                        /* Socket */
     struct sockaddr_in echoServAddr; /* Local address */
     struct sockaddr_in echoClntAddr; /* Client address */
     unsigned int cliAddrLen;         /* Length of incoming message */
-    char echoBuffer[ECHOMAX];        /* Buffer for echo string */
+//    char echoBuffer[ECHOMAX];        /* Buffer for echo string */
     unsigned short echoServPort;     /* Server port */
 	int recvMsgSize;                 /* Size of received message */
-    const short strLen = 5;
 	char clientString[strLen+1] = "     ";			 /* 5-element string belonging to the client */
     stringstream keyStream;
 
@@ -104,7 +91,8 @@ int main(int argc, char *argv[])
             DieWithError("recvfrom() failed");
 
 #ifdef DEBUG
-        printf("Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr));
+        printf( "Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr) );
+
 		printf("Server:: received client data::\n");
 		printf("clientRequest.client_ip(char*)\t= %s\n", clientRequest.client_ip);
 		printf("clientRequest.inc (int)\t\t= %d\n", clientRequest.inc);
@@ -138,16 +126,23 @@ int main(int argc, char *argv[])
 		// modify the string stored with the client
 		updateClientString(clientString, clientRequest.c, strLen);
 #ifdef DEBUG
-		printf("New client string is %s\n\n", clientString);
+		printf("New client string is %s\n", clientString);
 #endif
 		/* copy client request data into the clientTable */
 
-
-
-        /* Send received datagram back to the client */
-        if (sendto(sock, echoBuffer, recvMsgSize, 0, 
-             (struct sockaddr *) &echoClntAddr, sizeof(echoClntAddr)) != recvMsgSize)
+#ifdef ACK_TO_CLIENT
+        /* Send current client string back to the client */
+        if ( sendto(sock, clientString, sizeof(clientString), 0, 
+             (struct sockaddr *) &echoClntAddr, sizeof(echoClntAddr)) != sizeof(clientString) )
             DieWithError("sendto() sent a different number of bytes than expected");
+#ifdef DEBUG
+        cout << "Server returned client string <" << clientString << "> to client at " << inet_ntoa(echoClntAddr.sin_addr) << endl;
+#endif
+#endif // ACK_TO_CLIENT
+#ifdef DEBUG
+        // new line to space out requests
+        cout << endl;
+#endif // DEBUG
     }
     /* NOT REACHED */
 }
