@@ -191,7 +191,9 @@ int main(int argc, char* argv[])//char  *argv[]
       echoServAddr.sin_addr.s_addr = inet_addr(servIP);  /* Server IP address */
       echoServAddr.sin_port   = htons(echoServPort);     /* Server port */
 
-	//------- get IP ----------- // should be a function
+#ifdef UNUSED
+
+//------- get IP ----------- // should be a function
 	//*** maybe use getpeername to get info like IP from socket
 	//I will check into it soon : http://support.sas.com/documentation/onlinedoc/sasc/doc700/html/lr2/zeername.htm
 	int socketDescriptor;//
@@ -212,7 +214,9 @@ int main(int argc, char* argv[])//char  *argv[]
 	//---- we have IP now ????????????????????????????????????????????????????????
 	
 	strcpy(clientRequest.client_ip, inet_ntoa(((struct sockaddr_in *) &interface.ifr_addr)->sin_addr));
-	
+#endif    	
+    strcpy(clientRequest.client_ip, getSocketIP() ); 
+
 	//print our IP address
 	printf("IP address = %s\n", clientRequest.client_ip);
     cout << endl;
