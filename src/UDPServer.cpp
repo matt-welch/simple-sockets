@@ -41,7 +41,7 @@ void ackToClient(const int& sock, const char* clientString, const struct sockadd
                 (struct sockaddr *) &echoClntAddr, sizeof(echoClntAddr) );
     
 #ifdef DEBUG
-    cout << "Server returned client string <" << localString << "> to client at " 
+    cout << "Server returned new client string <" << localString << "> to client at " 
         << inet_ntoa(echoClntAddr.sin_addr) << " (" << bytesSent << " bytes sent)" <<endl;
 #endif // DEBUG
     /* Send current client string back to the client */
@@ -53,11 +53,13 @@ void ackToClient(const int& sock, const char* clientString, const struct sockadd
 // client table
 // TODO this function should not return the newString, but should take it as
 // an input argument reference like the table and request
-string handleClientData( client_table_t& clientTable, request_t& clientRequest){
-    string newString;
+int handleClientData( client_table_t& clientTable, request_t& clientRequest, string& newString){
     client_data_t clientVector;
     stringstream clientKey;
 	char clientString[strLen+1] = "     ";			 /* 5-element string belonging to the client */
+    int returnCode = -1;
+    int numRecords = 0;
+    int requestNum = 0;
 
     // assemble the client key string from the components of the clients request
     clientKey.str(""); // clear the key 
@@ -67,6 +69,7 @@ string handleClientData( client_table_t& clientTable, request_t& clientRequest){
 #ifdef DEBUG
     cout << "ClientKey = " << clientKey.str() << endl;
 #endif
+    requestNum = clientRequest.req; 
 
     /* determine if the clientTable already has data from this client */
     client_table_t::iterator table_it= clientTable.find(clientKey.str());
@@ -79,21 +82,52 @@ string handleClientData( client_table_t& clientTable, request_t& clientRequest){
 #endif
         // copy in the new string (one character)
         newString = clientRequest.c;
+        returnCode = 1;
     }else{// client data found, get it from the table and add the new string
         // get the client data from the table
         clientVector = table_it->second; //clientTable[clientKey.str()];
-        // copy the last string from the table to the client String
-        strcpy(clientString, clientVector.back().c_str());
-        // modify the string stored with the client
-        updateClientString(clientString, clientRequest.c, strLen);
-        // create a new string to add to the client data
-        newString = clientString;
+        numRecords = clientVector.size();
+
+        if ( requestNum > numRecords ) {
+            // R > r  // assumed to be the common case so it's first
+            /* new request store the record in the table, send the response*/
+#ifdef DEBUG
+        printf("Server:: handleClientData():: %d > %d, storing response\n", requestNum, numRecords ); 
+#endif
+            // copy the last string from the table to the client String
+            strcpy(clientString, clientVector.back().c_str());
+            // modify the string stored with the client
+            updateClientString(clientString, clientRequest.c, strLen);
+            // create a new string to add to the client data
+            newString = clientString;
+            returnCode = 1;
+
+        }else if( requestNum == numRecords ){
+            // R == r
+            // send the stored repsonse to the client
+#ifdef DEBUG
+        printf("Server:: handleClientData():: %d == %d, sending stored response\n", requestNum, numRecords ); 
+#endif
+            newString = clientVector.back();
+            returnCode = 0;
+        }else{
+            // R < r
+#ifdef DEBUG
+        printf("Server:: handleClientData():: %d < %d, old request, don't store\n", requestNum, numRecords ); 
+#endif
+            // the request is old, ignore it and do not send the response
+            returnCode = -1;
+        }
     }
-    // push the updated string onto the client data
-    clientVector.push_back(newString);
-    // update the client table with new string
-    clientTable[clientKey.str()] = clientVector;
-    return newString; 
+    if(returnCode > 0){
+        // push the updated string onto the client data
+        clientVector.push_back(newString);
+        // update the client table with new string
+        clientTable[clientKey.str()] = clientVector;
+    }
+   
+    // return code based on old/recent/new data  {-1, 0, 1} 
+    return returnCode; 
 }
 
 int main(int argc, char *argv[])
@@ -102,14 +136,14 @@ int main(int argc, char *argv[])
     struct sockaddr_in echoServAddr; /* Local address */
     struct sockaddr_in echoClntAddr; /* Client address */
     unsigned int cliAddrLen;         /* Length of incoming message */
-//    char echoBuffer[ECHOMAX];        /* Buffer for echo string */
     unsigned short echoServPort;     /* Server port */
 	int recvMsgSize;                 /* Size of received message */
 	char clientString[strLen+1] = "     ";	 /* 5-element string belonging to the client */
     stringstream clientKey;
     client_data_t clientVector;
     string newString;
-	int failureProbability = 0;
+	int fp, failureProbability = 0;
+    int returnCode = -1;
 
 	/* random seed */
     srand(time(NULL));
@@ -161,109 +195,55 @@ int main(int argc, char *argv[])
 #endif
         //fail 1 do nothing
         //fail 2 add data to table but no send response
-        int fp = failureProbability;
-
-        if(fp > 2)
+        fp = failureProbability;
+        cout << "Server: fp = " << fp << endl;
+        if(fp >= 2)
         {//do right thing
 #ifdef DEBUG
-            cout << "fp = " << fp << ", handling client data and sending ack to client" << endl;
+            cout << "Server: Normal operation: handling client data and sending ack to client" << endl;
             printf( "Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr) );
 #endif
-            newString = handleClientData(clientTable, clientRequest);
+            returnCode =  handleClientData(clientTable, clientRequest, newString);
             strcpy(clientString, newString.c_str() );
-
-            // use the function ackToClient
+            if (returnCode < 0) {
+                // clientRequest.req < last_stored_req
+                // data is old, do not re-send the ack
+                // do nothing
+            }else if (returnCode == 0) {
+                // clientRequest.req == last_stored_req
+                // send the stored response to the client
+                // send acknowledgement to the client
 #ifdef DEBUG
-            cout << "Server about to ack to client" << endl;
+                cout << "Server: about to ack to client" << endl;
 #endif
-            ackToClient(sock, clientString, echoClntAddr );
+                ackToClient(sock, clientString, echoClntAddr );
+            }else{ // TODO OPTIMIZATION: this is not necessary and code0,1 can be handles in same case
+                // clientRequest.req > last_stored_request
+                // data is new, store the response and send the ack
+                // send acknowledgement to the client
+#ifdef DEBUG
+                cout << "Server: about to ack to client" << endl;
+#endif
+                ackToClient(sock, clientString, echoClntAddr );
+            }
+
         }
-        else if(fp > 0 && fp <= 1)
+        else if(fp == 1)
         {//add data to table but no response		
 #ifdef DEBUG
-            cout << "fp = " << fp << ", handling client data DON'T ack to client" << endl;
+            cout << "Server: Failure Mode 1: handling client data DON'T ack to client" << endl;
 #endif
-            newString = handleClientData(clientTable, clientRequest);
+            returnCode =  handleClientData(clientTable, clientRequest, newString);
             strcpy(clientString, newString.c_str() );
         }
-        else if(fp > 1 && fp <= 2)
+        else if(fp == 0)
         {//do nothing
 #ifdef DEBUG
-            cout << "fp = " << fp << ", do nothing " << endl;
+            cout << "Server: Failure Mode 2: do nothing " << endl;
 #endif
             continue;
         }
 			
-
-#if STORE_WITH_FUNCTION
-    newString = handleClientData(clientTable, clientRequest);
-    strcpy(clientString, newString.c_str() );
-    
-#else // STORE_WITH_FUNCTION
-        // assemble the client key string from the components of the clients request
-        clientKey.str(""); // clear the key 
-        // assemble the key
-        clientKey << clientRequest.client_ip << "_" << clientRequest.client << "_"
-            << clientRequest.inc;
-#ifdef DEBUG
-        cout << "ClientKey = " << clientKey.str() << endl;
-#endif
-
-#if STORE_CLIENT_DATA
-		/* determine if the clientTable already has data from this client */
-		client_table_t::iterator table_it= clientTable.find(clientKey.str());
-
-        if(table_it == clientTable.end()) {// no entry found, create new
-    #ifdef DEBUG
-            cout << "Client key <" << clientKey.str() << 
-                "> not found in the table, creating new entry:" << 
-                "< " << clientKey.str() << ", '" << clientRequest.c << "' >" << endl;
-    #endif
-            // clear clientVector to create a new vector of client data
-            clientVector.clear();
-            // copy in the new string (one character)
-            newString = clientRequest.c;
-        }else{// client data found, get it from the table and add the new string
-            // get the client data from the table
-            clientVector = table_it->second; //clientTable[clientKey.str()];
-            // copy the last string from the table to the client String
-            strcpy(clientString, clientVector.back().c_str());
-            // modify the string stored with the client
-            updateClientString(clientString, clientRequest.c, strLen);
-            // create a new string to add to the client data
-            newString = clientString;
-        }
-        // push the updated string onto the client data
-        clientVector.push_back(newString);
-        // update the client table with new string
-        clientTable[clientKey.str()] = clientVector;
-#else
-		// modify the string stored with the client
-		updateClientString(clientString, clientRequest.c, strLen);
-#endif // STORE_CLIENT_DATA
-
-#endif // STORE_WITH_FUNCTION
-#ifdef DEBUG
-		printf("New client string is %s\n", clientString);
-#endif
-
-#ifdef ACK_TO_CLIENT
-    #ifdef DONTUSEFUNCTION
-        /* Send current client string back to the client */
-        if ( sendto(sock, clientString, sizeof(clientString), 0, 
-             (struct sockaddr *) &echoClntAddr, sizeof(echoClntAddr)) != sizeof(clientString) )
-                DieWithError("sendto() sent a different number of bytes than expected");
-        #ifdef DEBUG
-        cout << "Server returned client string <" << clientString << "> to client at " << inet_ntoa(echoClntAddr.sin_addr) << endl;
-        #endif // DEBUG
-    #endif
-        // use the function ackToClient
-    #ifdef UNUSED
-        cout << "Server about to ack to client" << endl;
-        ackToClient(sock, clientString, echoClntAddr );
-    #endif
-#endif // ACK_TO_CLIENT
-
 #ifdef DEBUG
         // new line to space out requests
         cout << endl;

@@ -21,6 +21,7 @@
 // TODO replace c-libraries with C++ libraries
 #include "request.hpp"  // header
 #include <time.h>
+#include <unistd.h> // for usleep TODO nanosleep is better
 
 //for getting ip info
 #include <net/if.h>
@@ -46,7 +47,33 @@ using namespace std;
 
 //#define DEBUG 1
 //-----------------------------------------------------
+void receiveAckFromServer( int& sock, const struct sockaddr_in& echoServAddr ){
+    unsigned int fromSize;           /* In-out of address size for recvfrom() */
+    int respStringLen;               /* Length of received response */
+    struct sockaddr_in fromAddr;     /* Source address of echo */
+    char echoBuffer[ECHOMAX+1];      /* Buffer for receiving echoed string */
 
+    /* Recv a response */
+    fromSize = sizeof(fromAddr);
+    respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0, (struct sockaddr *) &fromAddr, &fromSize);
+#ifdef DEBUG
+    cout << "Bytes Received = " << respStringLen << ", Bytes expected = " << strLen+1 << endl;
+#endif
+    if ( respStringLen != strLen+1 )
+        DieWithError("recvfrom() failed");
+
+    if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr)
+    {
+        fprintf(stderr,"Error: received a packet from unknown source.\n");
+        exit(1);
+    }
+
+    /* null-terminate the received data */
+    echoBuffer[respStringLen] = '\0';
+    printf("String Received from server:\t\t%s\n", echoBuffer);    /* Print the echoed arg */
+
+
+}
 
 int getValueFromFile(string filename){
     // open the file as a filestream
@@ -56,7 +83,7 @@ int getValueFromFile(string filename){
     int int_incarNumber=0;
 
 // open the file for read-only access
-#ifdef DEBUG
+#ifdef VERBOSE
     printf("getValueFromFile():: About to open file \"%s\"\n",filename.c_str());
 #endif
     if( infile.fail() ) {
@@ -68,7 +95,7 @@ int getValueFromFile(string filename){
         outFile.close();
     }else{
         getline(infile, inString);
-#ifdef DEBUG
+#ifdef VERBOSE
         cout << "getValueFromFile():: incarnation number found = <" << inString << ">" << endl;
 #endif
         if(inString.length() > 0)
@@ -145,10 +172,10 @@ int main(int argc, char* argv[])//char  *argv[]
     struct sockaddr_in fromAddr;     /* Source address of echo */
 	char clientString[strLen+1] = "     "; /* 5-element string belonging to the client */
     char echoBuffer[ECHOMAX+1];      /* Buffer for receiving echoed string */
-    int echoStringLen = strLen+1;               /* Length of string to echo */
+    //int echoStringLen = strLen+1;               /* Length of string to echo */
     int respStringLen;               /* Length of received response */
 #endif // RECEIVE_FROM_SERVER
-
+    unsigned int sleepTime = 500000; // sleep time for client in microseconds (us)
     int clientNum;                   /* client number, passed in as a command line argument */
 	request_t clientRequest; //new reques
 
@@ -255,47 +282,59 @@ int main(int argc, char* argv[])//char  *argv[]
             clientRequest.inc = checkIncarNum();
         }
 
-        
+        do{ 
 #ifdef DEBUG
-		printf("Client:: sending client data::\n");
-        printRequestStructure(clientRequest);
+            printf("Client:: sending client data::\n");
+            printRequestStructure(clientRequest);
 #endif
-		/* Send the string to the server */
-		if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
-					&echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
-			DieWithError("sendto() sent a different number of bytes than expected");
-		// modify the string stored with the client
-		updateClientString(clientString, clientRequest.c, strLen);
+            /* Send the string to the server */
+            if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
+                        &echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
+                DieWithError("sendto() sent a different number of bytes than expected");
+            // modify the string stored with the client
+            updateClientString(clientString, clientRequest.c, strLen);
 #ifdef DEBUG  //"String Received from server: "
-        cout << "Client string (stored by client):\t" << clientString <<  endl;
+            cout << "Client string (stored by client):\t" << clientString <<  endl;
 #endif
 
-        // need to receive a response form the server to verify the packet was
-        // received??
+            // need to receive a response form the server to verify the packet was
+            // received??
 #ifdef RECEIVE_FROM_SERVER
-        /* Recv a response */
-        /* TODO make this a function */
-        fromSize = sizeof(fromAddr);
-        int bytesRecv = (respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
-                        (struct sockaddr *) &fromAddr, &fromSize));
+            /* Recv a response */
+            /* TODO make this a function */
+            fromSize = sizeof(fromAddr);
+            respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
+                        (struct sockaddr *) &fromAddr, &fromSize);
 #ifdef DEBUG
-        cout << "Bytes Received = " << bytesRecv << ", Bytes expected = " << sizeof(clientString) << endl;
+            cout << "Bytes Received = " << respStringLen << ", Bytes expected = " << sizeof(clientString) << endl;
 #endif
-        if ( bytesRecv != sizeof(clientString) )
-            DieWithError("recvfrom() failed");
+            if ( respStringLen != sizeof(clientString) )
+                DieWithError("recvfrom() failed");
 
-        if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr)
-        {
-            fprintf(stderr,"Error: received a packet from unknown source.\n");
-            exit(1);
-        }
+            if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr)
+            {
+                fprintf(stderr,"Error: received a packet from unknown source.\n");
+                exit(1);
+            }
 
-        /* null-terminate the received data */
-        echoBuffer[respStringLen] = '\0';
-        printf("String Received from server:\t\t%s\n", echoBuffer);    /* Print the echoed arg */
+            /* null-terminate the received data */
+            echoBuffer[respStringLen] = '\0';
+            printf("String Received from server:\t\t%s\n", echoBuffer);    /* Print the echoed arg */
 #endif // RECEIVE_FROM_SERVER
 
-
+            // put the client to sleep for a bit - should be an input argument
+            // in seconds or milliseconds would be better
+#ifdef DEBUG
+            cout << "Client: sleeping for "<< sleepTime << " us...." << endl;
+#endif           
+            usleep(sleepTime);
+            // TODO need to compare string of server ack to the string held by
+            // the client to determine if the client needs to resend data
+            // strcmp( echoBuffer, clientString)
+            // if same, move on
+            // else if server is older by one character, resend
+            // else if server is newer by one character, move on
+        }while (0);
 
 #ifdef DEBUG
         cout << endl;
