@@ -155,6 +155,10 @@ int main(int argc, char *argv[])
         if ((recvMsgSize = recvfrom(sock, &clientRequest, sizeof(request_t), 
                         0,(struct sockaddr *) &echoClntAddr, &cliAddrLen)) < 0)
             DieWithError("recvfrom() failed");
+#ifdef DEBUG
+		printf("Server:: received client data::\n");
+        printRequestStructure(clientRequest);
+#endif
         //fail 1 do nothing
         //fail 2 add data to table but no send response
         int fp = failureProbability;
@@ -190,10 +194,6 @@ int main(int argc, char *argv[])
             continue;
         }
 			
-#ifdef DEBUG
-		printf("Server:: received client data::\n");
-        printRequestStructure(clientRequest);
-#endif
 
 #if STORE_WITH_FUNCTION
     newString = handleClientData(clientTable, clientRequest);
@@ -248,18 +248,20 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef ACK_TO_CLIENT
-#ifdef DONTUSEFUNCTION
+    #ifdef DONTUSEFUNCTION
         /* Send current client string back to the client */
         if ( sendto(sock, clientString, sizeof(clientString), 0, 
              (struct sockaddr *) &echoClntAddr, sizeof(echoClntAddr)) != sizeof(clientString) )
                 DieWithError("sendto() sent a different number of bytes than expected");
-    #ifdef DEBUG
+        #ifdef DEBUG
         cout << "Server returned client string <" << clientString << "> to client at " << inet_ntoa(echoClntAddr.sin_addr) << endl;
-    #endif // DEBUG
-#endif
+        #endif // DEBUG
+    #endif
         // use the function ackToClient
+    #ifdef UNUSED
         cout << "Server about to ack to client" << endl;
         ackToClient(sock, clientString, echoClntAddr );
+    #endif
 #endif // ACK_TO_CLIENT
 
 #ifdef DEBUG
