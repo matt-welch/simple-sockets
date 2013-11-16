@@ -19,12 +19,6 @@
  * */
 
 // TODO replace c-libraries with C++ libraries
-#include <stdio.h>      /* for printf() and fprintf() */
-#include <sys/socket.h> /* for socket(), connect(), sendto(), and recvfrom() */
-#include <arpa/inet.h>  /* for sockaddr_in and inet_addr() */
-#include <stdlib.h>     /* for atoi() and exit() */
-#include <string.h>     /* for memset() */
-#include <unistd.h>     /* for close() */
 #include "request.hpp"  // header
 #include <time.h>
 
@@ -45,24 +39,10 @@ using std::getline;
 #include <fstream>
 using namespace std;
 
-#include <string>
-using std::string;
-
-#include <pthread.h>  /* for mutex lock on file access */
-
-#define USEFSTREAM
 #define SHOWERRORS 1
 //#define DEBUG 1
 //-----------------------------------------------------
 
-// lock for accessing the incarnation file
-pthread_mutex_t g_lock_incarnationFile;
-
-void DieWithError(const char *errorMessage) /* External error handling function */
-{
-    perror(errorMessage);
-    exit(1);
-}
 
 int getValueFromFile(string filename){
     // open the file as a filestream
@@ -216,6 +196,9 @@ int main(int argc, char* argv[])//char  *argv[]
 	
 	strcpy(clientRequest.client_ip, inet_ntoa(((struct sockaddr_in *) &interface.ifr_addr)->sin_addr));
 #endif    	
+
+
+
     strcpy(clientRequest.client_ip, getSocketIP() ); 
 
 	//print our IP address
@@ -272,11 +255,7 @@ int main(int argc, char* argv[])//char  *argv[]
         
 #ifdef DEBUG
 		printf("Client:: sending client data::\n");
-		printf("clientRequest.client_ip(char*)\t= %s\n", clientRequest.client_ip);
-		printf("clientRequest.inc (int)\t\t= %d\n", clientRequest.inc);
-		printf("clientRequest.client (int)\t= %d\n", clientRequest.client);
-		printf("clientRequest.req (int)\t\t= %d\n", clientRequest.req);
-		printf("clientRequest.c (char)\t\t= %c\n", clientRequest.c);
+        printRequestStructure(clientRequest);
 #endif
 		/* Send the string to the server */
 		if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
@@ -293,8 +272,12 @@ int main(int argc, char* argv[])//char  *argv[]
 #ifdef ACK_TO_CLIENT
         /* Recv a response */
         fromSize = sizeof(fromAddr);
-        if ((respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
-                        (struct sockaddr *) &fromAddr, &fromSize)) != echoStringLen)
+        int bytesRecv = (respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
+                        (struct sockaddr *) &fromAddr, &fromSize));
+#ifdef DEBUG
+        cout << "Bytes Received = " << bytesRecv << ", Bytes expected = " << sizeof(clientString) << endl;
+#endif
+        if ( bytesRecv != sizeof(clientString) )
             DieWithError("recvfrom() failed");
 
         if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr)

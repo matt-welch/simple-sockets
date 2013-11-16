@@ -18,12 +18,6 @@
  * algorithm of this eschange is more fully described in the README.MD.  
  **************************************************************************** */
 
-#include <stdio.h>      /* for printf() and fprintf() */
-#include <sys/socket.h> /* for socket() and bind() */
-#include <arpa/inet.h>  /* for sockaddr_in and inet_ntoa() */
-#include <stdlib.h>     /* for atoi() and exit() */
-#include <string.h>     /* for memset() */
-#include <unistd.h>     /* for close() */
 #include "UDPServer.hpp" // server header file 
 
 #include <sstream>
@@ -36,15 +30,30 @@ using std::cin;
 
 #define DEBUG 1
 #define STORE_CLIENT_DATA 1
-#define STORE_WITH_FUNCTION
+#define STORE_WITH_FUNCTION 1
 
-void DieWithError(const char *errorMessage) /* External error handling function */
-{
-    perror(errorMessage);
-    exit(1);
+// function to reply to the client with its current string
+// TODO all input arguments can be const
+void ackToClient(const int& sock, const char* clientString, const struct sockaddr_in& echoClntAddr ){
+    char localString[strLen+1];
+    strcpy(localString, clientString);
+    int bytesSent = sendto( sock, localString, strLen+1, 0, 
+                (struct sockaddr *) &echoClntAddr, sizeof(echoClntAddr) );
+    
+#ifdef DEBUG
+    cout << "Server returned client string <" << localString << "> to client at " 
+        << inet_ntoa(echoClntAddr.sin_addr) << " (" << bytesSent << " bytes sent)" <<endl;
+#endif // DEBUG
+    /* Send current client string back to the client */
+    if ( bytesSent != (strLen+1) )
+        DieWithError("sendto() sent a different number of bytes than expected");
 }
 
-string storeClientData( client_table_t& clientTable, request_t& clientRequest){
+// function to handle the client request by looking up and/or storing in the
+// client table
+// TODO this function should not return the newString, but should take it as
+// an input argument reference like the table and request
+string handleClientData( client_table_t& clientTable, request_t& clientRequest){
     string newString;
     client_data_t clientVector;
     stringstream clientKey;
@@ -68,14 +77,10 @@ string storeClientData( client_table_t& clientTable, request_t& clientRequest){
             "> not found in the table, creating new entry:" << 
             "< " << clientKey.str() << ", '" << clientRequest.c << "' >" << endl;
 #endif
-        // clear clientVector to create a new vector of client data
-        clientVector.clear();
         // copy in the new string (one character)
         newString = clientRequest.c;
     }else{// client data found, get it from the table and add the new string
         // get the client data from the table
-        // TODO: this step may be redundant since we just looked up the
-        // iterator
         clientVector = table_it->second; //clientTable[clientKey.str()];
         // copy the last string from the table to the client String
         strcpy(clientString, clientVector.back().c_str());
@@ -148,41 +153,50 @@ int main(int argc, char *argv[])
 
         /* Block until receive message from a client */
         if ((recvMsgSize = recvfrom(sock, &clientRequest, sizeof(request_t), 
-						0,(struct sockaddr *) &echoClntAddr, &cliAddrLen)) < 0)
+                        0,(struct sockaddr *) &echoClntAddr, &cliAddrLen)) < 0)
             DieWithError("recvfrom() failed");
-//fail 1 do nothing
-//fail 2 add data to table but no send response
-		int fp = failureProbability;
+        //fail 1 do nothing
+        //fail 2 add data to table but no send response
+        int fp = failureProbability;
 
-		if(fp > 2)
-		{
-		//do right thing
+        if(fp > 2)
+        {//do right thing
+#ifdef DEBUG
+            cout << "fp = " << fp << ", handling client data and sending ack to client" << endl;
+            printf( "Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr) );
+#endif
+            newString = handleClientData(clientTable, clientRequest);
+            strcpy(clientString, newString.c_str() );
 
-		}
-		else if(fp > 0 && fp <= 1)
-		{
-		//add data to table but no response		
-
-		}
-		else if(fp > 1 && fp <= 2)
-		{
-		//do nothing
-			continue;
-		}
+            // use the function ackToClient
+#ifdef DEBUG
+            cout << "Server about to ack to client" << endl;
+#endif
+            ackToClient(sock, clientString, echoClntAddr );
+        }
+        else if(fp > 0 && fp <= 1)
+        {//add data to table but no response		
+#ifdef DEBUG
+            cout << "fp = " << fp << ", handling client data DON'T ack to client" << endl;
+#endif
+            newString = handleClientData(clientTable, clientRequest);
+            strcpy(clientString, newString.c_str() );
+        }
+        else if(fp > 1 && fp <= 2)
+        {//do nothing
+#ifdef DEBUG
+            cout << "fp = " << fp << ", do nothing " << endl;
+#endif
+            continue;
+        }
 			
 #ifdef DEBUG
-        printf( "Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr) );
-
 		printf("Server:: received client data::\n");
-		printf("clientRequest.client_ip(char*)\t= %s\n", clientRequest.client_ip);
-		printf("clientRequest.inc (int)\t\t= %d\n", clientRequest.inc);
-		printf("clientRequest.client (int)\t= %d\n", clientRequest.client);
-		printf("clientRequest.req (int\t)\t= %d\n", clientRequest.req);
-		printf("clientRequest.c (char)\t\t= %c\n", clientRequest.c);
+        printRequestStructure(clientRequest);
 #endif
 
-#ifdef STORE_WITH_FUNCTION
-    newString = storeClientData(clientTable, clientRequest);
+#if STORE_WITH_FUNCTION
+    newString = handleClientData(clientTable, clientRequest);
     strcpy(clientString, newString.c_str() );
     
 #else // STORE_WITH_FUNCTION
@@ -211,8 +225,6 @@ int main(int argc, char *argv[])
             newString = clientRequest.c;
         }else{// client data found, get it from the table and add the new string
             // get the client data from the table
-            // TODO: this step may be redundant since we just looked up the
-            // iterator
             clientVector = table_it->second; //clientTable[clientKey.str()];
             // copy the last string from the table to the client String
             strcpy(clientString, clientVector.back().c_str());
@@ -236,6 +248,7 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef ACK_TO_CLIENT
+#ifdef DONTUSEFUNCTION
         /* Send current client string back to the client */
         if ( sendto(sock, clientString, sizeof(clientString), 0, 
              (struct sockaddr *) &echoClntAddr, sizeof(echoClntAddr)) != sizeof(clientString) )
@@ -243,6 +256,10 @@ int main(int argc, char *argv[])
     #ifdef DEBUG
         cout << "Server returned client string <" << clientString << "> to client at " << inet_ntoa(echoClntAddr.sin_addr) << endl;
     #endif // DEBUG
+#endif
+        // use the function ackToClient
+        cout << "Server about to ack to client" << endl;
+        ackToClient(sock, clientString, echoClntAddr );
 #endif // ACK_TO_CLIENT
 
 #ifdef DEBUG

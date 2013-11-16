@@ -5,13 +5,23 @@
 //
 //////////////////////////////////////////////////
 
+/* common libraries to server and client */
+#include <stdio.h>      /* for printf() and fprintf() */
+#include <sys/socket.h> /* for socket() and bind() */
+#include <arpa/inet.h>  /* for sockaddr_in and inet_ntoa() */
+#include <stdlib.h>     /* for atoi() and exit() */
+#include <string.h>     /* for memset() */
+#include <unistd.h>     /* for close() */
+#include <string>
+using std::string;
 
-#include <arpa/inet.h>
+/* libraries needed only for functions defined in request.hpp */
 #include <ifaddrs.h>
-#include <string.h>
 #include <sys/types.h>
 
 #define ACK_TO_CLIENT 1
+// variables common to the server and client
+const short strLen = 5;
 
 typedef struct request
 {
@@ -23,6 +33,12 @@ typedef struct request
 }request_t;
 
 char addressBuffer[INET_ADDRSTRLEN]; //INET_ADDRSTRLEN = 16
+
+void DieWithError(const char *errorMessage) /* External error handling function */
+{
+    perror(errorMessage);
+    exit(1);
+}
 
 char* getSocketIP()
 {
@@ -60,8 +76,13 @@ void updateClientString(char* myString, char c, int len){
 	return;
 }
 
-// variables common to the server and client
-const short strLen = 5;
+void printRequestStructure(request_t clientRequest){
+    printf("\tclientRequest.client_ip(char*)\t= %s\n", clientRequest.client_ip);
+    printf("\tclientRequest.inc (int)\t\t= %d\n", clientRequest.inc);
+    printf("\tclientRequest.client (int)\t= %d\n", clientRequest.client);
+    printf("\tclientRequest.req (int)\t\t= %d\n", clientRequest.req);
+    printf("\tclientRequest.c (char)\t\t= %c\n", clientRequest.c);
+}
 
 // the following are likely unused
 #define ECHOMAX 255     /* Longest string to echo */
