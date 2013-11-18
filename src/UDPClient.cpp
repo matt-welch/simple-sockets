@@ -180,8 +180,9 @@ int main(int argc, char* argv[])//char  *argv[]
     //int echoStringLen = strLen+1;               /* Length of string to echo */
     int respStringLen;               /* Length of received response */
 #endif // RECEIVE_FROM_SERVER
-    //unsigned int sleepTime = 500000; // sleep time for client in microseconds (us)
-    int clientNum;                   /* client number, passed in as a command line argument */
+
+    unsigned int sleepTime = 500000; // sleep time for client in microseconds (us)
+    int clientNum = 0;                   /* client number, passed in as a command line argument */
 	request_t clientRequest; //new reques
 	//for sockopt, using sockopt to control timeout for resend of packet
 	struct timeval tv;
@@ -191,16 +192,40 @@ int main(int argc, char* argv[])//char  *argv[]
 	/* random seed */
 	srand(time(NULL));
 
+#ifdef VERBOSE
+    cout << "Client Argument list: " << argc << " arguments supplied" << endl;
+    for (int i = 0; i < argc; i++) {
+        cout << "Arg[" << i << "] = <" << argv[i] << ">" <<  endl;
+    }
+#endif
+
     // parse command line arguments
-    if ((argc < 3) || (argc > 4))    /* Test for correct number of arguments */
+    if ( (argc < 3) || (argc > 5) )    /* Test for correct number of arguments */
     {
-        fprintf(stderr,"Usage: %s <Server IP> <Server Port> <ClientNumber>\n", argv[0]);
+        fprintf(stderr,"Usage: %s <Server IP> <Server Port> [ClientNumber] [sleeptime(us)]\n", argv[0]);
         exit(1);
     }
+
     servIP = argv[1];           /* First arg: server IP address (dotted quad) */
     echoServPort = atoi(argv[2]);  /* Use given port */
     //echoServPort = 65432;  /* experimental port range port as default */
-    clientNum = atoi(argv[3]); 
+    if ( argc > 3) {
+        // client number has been supplied as the third command line argument
+        clientNum = atoi(argv[3]); 
+#ifdef DEBUG
+        printf("clientNum = %d\n", clientNum);
+#endif
+        if (argc > 4) {
+            // sleep time has been supplied
+            sleepTime = atoi(argv[4]); 
+#ifdef DEBUG
+            printf("sleep time = %d\n", sleepTime);
+#endif
+        }
+    }else{
+        cout << "No client number supplied, using clientNum=0" << endl;
+    }
+
 
     /* Create a datagram/UDP socket */
     if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
@@ -216,11 +241,10 @@ int main(int argc, char* argv[])//char  *argv[]
 
 #endif    	
 
-    //get client IP and assign to field
     strcpy(clientRequest.client_ip, getSocketIP() ); 
 
 	//print our IP address
-	printf("IP address = %s\n", clientRequest.client_ip);
+	printf("Client IP address = %s\n", clientRequest.client_ip);
     cout << endl;
     failurePoint = rand() % (MAX_REQUESTS) ; // the iteration at which failures wil begin with a probability of 50%
     cout << "Client number " << clientNum << " will fail at iteration " << failurePoint+1 << endl;
