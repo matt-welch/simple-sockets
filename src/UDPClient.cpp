@@ -28,7 +28,8 @@
 #include <netinet/in.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
-
+//for using fcntl()
+#include <fcntl.h>
 #include <iostream>
 using std::cout;
 using std::endl;
@@ -36,6 +37,10 @@ using std::cin;
 using std::ostream;
 using std::istream;
 using std::getline;
+ 
+
+
+
 
 #include <fstream>
 using namespace std;
@@ -175,9 +180,13 @@ int main(int argc, char* argv[])//char  *argv[]
     //int echoStringLen = strLen+1;               /* Length of string to echo */
     int respStringLen;               /* Length of received response */
 #endif // RECEIVE_FROM_SERVER
-    unsigned int sleepTime = 500000; // sleep time for client in microseconds (us)
+    //unsigned int sleepTime = 500000; // sleep time for client in microseconds (us)
     int clientNum;                   /* client number, passed in as a command line argument */
 	request_t clientRequest; //new reques
+	//for sockopt, using sockopt to control timeout for resend of packet
+	struct timeval tv;
+	tv.tv_sec = 1;   // 1 Secs Timeout 
+	tv.tv_usec = 0;  // 
 
 	/* random seed */
 	srand(time(NULL));
@@ -205,31 +214,9 @@ int main(int argc, char* argv[])//char  *argv[]
 
 #ifdef UNUSED
 
-//------- get IP ----------- // should be a function
-	//*** maybe use getpeername to get info like IP from socket
-	//I will check into it soon : http://support.sas.com/documentation/onlinedoc/sasc/doc700/html/lr2/zeername.htm
-	int socketDescriptor;//
-	struct ifreq interface;
-	
-	socketDescriptor = socket(AF_INET, SOCK_DGRAM, 0);
-	
-	//get IPv4 address ################################################
-	interface.ifr_addr.sa_family = AF_INET;
-	
-	//get address attached to eth0 
-	strncpy(interface.ifr_name, "p4p1", IFNAMSIZ-1);
-	
-	ioctl(socketDescriptor, SIOCGIFADDR, &interface);
-	
-	close(socketDescriptor);
-	
-	//---- we have IP now ????????????????????????????????????????????????????????
-	
-	strcpy(clientRequest.client_ip, inet_ntoa(((struct sockaddr_in *) &interface.ifr_addr)->sin_addr));
 #endif    	
 
-
-
+    //get client IP and assign to field
     strcpy(clientRequest.client_ip, getSocketIP() ); 
 
 	//print our IP address
@@ -280,19 +267,23 @@ int main(int argc, char* argv[])//char  *argv[]
         }else{
             // no failures yet, just check that nobody else has updated it
             clientRequest.inc = checkIncarNum();
-        }
+        	 }
 
         do{ 
 #ifdef DEBUG
             printf("Client:: sending client data::\n");
             printRequestStructure(clientRequest);
 #endif
+
             /* Send the string to the server */
             if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
                         &echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
                 DieWithError("sendto() sent a different number of bytes than expected");
             // modify the string stored with the client
             updateClientString(clientString, clientRequest.c, strLen);
+cout << "sending to surver : " << clientString << endl;
+cout << "echoBuffer = " << echoBuffer << endl;
+
 #ifdef DEBUG  //"String Received from server: "
             cout << "Client string (stored by client):\t" << clientString <<  endl;
 #endif
@@ -300,16 +291,42 @@ int main(int argc, char* argv[])//char  *argv[]
             // need to receive a response form the server to verify the packet was
             // received??
 #ifdef RECEIVE_FROM_SERVER
+
+// #################### MATT 
+			//I came across setsockopt when looking for fcntl() examples 
+			//the following will set a receive-time for the socket it is set to one second
+			//from line 188; if there is not packet received after 'tv' amount of time the 
+			//the control-flow moves to next line. 
+			//I chose this because I could not figure out how to tell recvfrom() to stop
+			//it seemed like it would hang waiting for server but ofcourse server was wating on
+			//client 
+			setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,sizeof(struct timeval));
+			
             /* Recv a response */
             /* TODO make this a function */
-            fromSize = sizeof(fromAddr);
+            fromSize = sizeof(fromAddr);		
             respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
                         (struct sockaddr *) &fromAddr, &fromSize);
+
+			//if respStringLen == -1 then nothing was received and we resend
+			if(respStringLen == -1)
+			{
+				//continue;
+				cout << "resending ???" << endl;
+
+            	if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
+                        &echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
+                DieWithError("sendto() sent a different number of bytes than expected");
+
+				respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
+                        (struct sockaddr *) &fromAddr, &fromSize);
+			}
+
 #ifdef DEBUG
             cout << "Bytes Received = " << respStringLen << ", Bytes expected = " << sizeof(clientString) << endl;
 #endif
             if ( respStringLen != sizeof(clientString) )
-                DieWithError("recvfrom() failed");
+              DieWithError("recvfrom() failed");
 
             if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr)
             {
@@ -326,11 +343,27 @@ int main(int argc, char* argv[])//char  *argv[]
             // in seconds or milliseconds would be better
 #ifdef DEBUG
             cout << "Client: sleeping for "<< sleepTime << " us...." << endl;
-#endif           
-            usleep(sleepTime);
+#endif
+
+           // if ( respStringLen != sizeof(clientString) )          
+            //usleep(sleepTime);
+	       // fcntl(sock, F_SETFL, O_NONBLOCK);//non_block sock
             // TODO need to compare string of server ack to the string held by
             // the client to determine if the client needs to resend data
-            // strcmp( echoBuffer, clientString)
+/*
+            if(strncmp(echoBuffer, clientString, strlen(clientString)))
+			{				 
+				cout << "strings are not the same" << endl;
+				if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
+                        &echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
+                DieWithError("sendto() sent a different number of bytes than expected");
+			}
+			else
+			{
+				cout << "strings match" << endl;
+				continue;
+			}
+*/
             // if same, move on
             // else if server is older by one character, resend
             // else if server is newer by one character, move on
