@@ -31,5 +31,9 @@ CONFIG		= -Wall -pedantic
 debug: CONFIG=$(DEBUG_FLAGS)
 debug: client server
 
-run: debug server client
+run: debug all
+	clear
 	./server 65432
+
+runclient: debug all 
+	./client 129.219.10.241 65432 0 

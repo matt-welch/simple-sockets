@@ -143,6 +143,7 @@ int main(int argc, char *argv[])
     client_data_t clientVector;
     string newString;
 	int fp, failureProbability = 0;
+    int totalPossibilities = 10;
     int returnCode = -1;
 
 	/* random seed */
@@ -162,6 +163,14 @@ int main(int argc, char *argv[])
     /* display the server's IP address  */
     cout << "Server is running at " << getSocketIP() << ":" << echoServPort << endl;
 
+#ifdef DEBUG
+        cout << "Server is set to fail 2/" << totalPossibilities << " of the time, is that ok??" << endl;
+        string response;
+        cin >> response; 
+        if ( response.compare("N") == 0 || response.compare("n") == 0 )
+            exit(1);
+        cout << "Server running with failure rate = 2/" << totalPossibilities << "...." << endl;
+#endif
     /* Create socket for sending/receiving datagrams */
     if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
         DieWithError("socket() failed");
@@ -180,7 +189,7 @@ int main(int argc, char *argv[])
     {
         // randomly calculate the failureProbability for each iteration 
         // past the failure point (0 to 10) 
-        failureProbability = rand() % 10;
+        failureProbability = rand() % totalPossibilities;
 
         /* Set the size of the in-out parameter */
         cliAddrLen = sizeof(echoClntAddr);
@@ -209,6 +218,9 @@ int main(int argc, char *argv[])
                 // clientRequest.req < last_stored_req
                 // data is old, do not re-send the ack
                 // do nothing
+#ifdef DEBUG
+                cout << endl;
+#endif
             }else if (returnCode == 0) {
                 // clientRequest.req == last_stored_req
                 // send the stored response to the client
@@ -239,7 +251,7 @@ int main(int argc, char *argv[])
         else if(fp == 0)
         {//do nothing
 #ifdef DEBUG
-            cout << "Server: Failure Mode 2: do nothing " << endl;
+            cout << "Server: Failure Mode 2: do nothing " << endl << endl;
 #endif
             continue;
         }

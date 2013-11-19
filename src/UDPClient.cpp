@@ -249,8 +249,18 @@ int main(int argc, char* argv[])//char  *argv[]
     failurePoint = rand() % (MAX_REQUESTS) ; // the iteration at which failures wil begin with a probability of 50%
     cout << "Client number " << clientNum << " will fail at iteration " << failurePoint+1 << endl;
  
-	/* build struct */
-	//clientRequest.client_ip = "129.219.102.8\0\0"
+    // #################### MATT 
+    //I came across setsockopt when looking for fcntl() examples 
+    //the following will set a receive-time for the socket it is set to one second
+    //from line 188; if there is not packet received after 'tv' amount of time the 
+    //the control-flow moves to next line. 
+    //I chose this because I could not figure out how to tell recvfrom() to stop
+    //it seemed like it would hang waiting for server but ofcourse server was wating on
+    //client 
+    /* TODO can't this setsockopt be moved outside any for loop, to
+     * just after the socket is instantiated?  Does it need to be set
+     * on each receive? */
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,sizeof(struct timeval));
 	
 
 	clientRequest.client = clientNum;
@@ -293,7 +303,9 @@ int main(int argc, char* argv[])//char  *argv[]
             clientRequest.inc = checkIncarNum();
         	 }
 
-        do{ 
+        do{ // send and attempt to receive from the server until the server sends a valid acknowledgement
+            // TODO should the check for failure be inside this do-while?
+            //
 #ifdef DEBUG
             printf("Client:: sending client data::\n");
             printRequestStructure(clientRequest);
@@ -305,8 +317,10 @@ int main(int argc, char* argv[])//char  *argv[]
                 DieWithError("sendto() sent a different number of bytes than expected");
             // modify the string stored with the client
             updateClientString(clientString, clientRequest.c, strLen);
-cout << "sending to surver : " << clientString << endl;
-cout << "echoBuffer = " << echoBuffer << endl;
+            cout << "Client sending to server : " << clientString << endl;
+#ifdef DEBUG
+            cout << "echoBuffer = " << echoBuffer << endl;
+#endif
 
 #ifdef DEBUG  //"String Received from server: "
             cout << "Client string (stored by client):\t" << clientString <<  endl;
@@ -316,27 +330,36 @@ cout << "echoBuffer = " << echoBuffer << endl;
             // received??
 #ifdef RECEIVE_FROM_SERVER
 
-// #################### MATT 
-			//I came across setsockopt when looking for fcntl() examples 
-			//the following will set a receive-time for the socket it is set to one second
-			//from line 188; if there is not packet received after 'tv' amount of time the 
-			//the control-flow moves to next line. 
-			//I chose this because I could not figure out how to tell recvfrom() to stop
-			//it seemed like it would hang waiting for server but ofcourse server was wating on
-			//client 
-			setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,sizeof(struct timeval));
-			
+
             /* Recv a response */
             /* TODO make this a function */
             fromSize = sizeof(fromAddr);		
             respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
-                        (struct sockaddr *) &fromAddr, &fromSize);
+                    (struct sockaddr *) &fromAddr, &fromSize);
 
 			//if respStringLen == -1 then nothing was received and we resend
-			if(respStringLen == -1)
-			{
+            //TODO currently only resending once - not suitable for server
+            //that frequently fails i.e. more thant once ina row
+			if(respStringLen == -1) {// TODO this condition should be in the while()conditional at the end
+            /* TODO the while conditoin should also check the string returned
+            * by the server to see if it is the same as the string held by
+            * the client using a compareStrings() function, called immediately
+            * after a valid receive: 
+            * do
+            *   send
+            *   receive
+            *   if receive == -1
+            *       continue
+            *   if (serverString != clientString)
+            *       if server string older than client string
+            *           resend
+            *   else
+            *       break
+            * while(1) 
+            * */
+			
 				//continue;
-				cout << "resending ???" << endl;
+				cout << "resending Request number " << clientRequest.req << "<" << clientRequest.c << ">" << endl;
 
             	if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
                         &echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
@@ -349,9 +372,10 @@ cout << "echoBuffer = " << echoBuffer << endl;
 #ifdef DEBUG
             cout << "Bytes Received = " << respStringLen << ", Bytes expected = " << sizeof(clientString) << endl;
 #endif
+#ifdef EXIT_ON_RECV_FAIL
             if ( respStringLen != sizeof(clientString) )
               DieWithError("recvfrom() failed");
-
+#endif
             if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr)
             {
                 fprintf(stderr,"Error: received a packet from unknown source.\n");
@@ -391,7 +415,7 @@ cout << "echoBuffer = " << echoBuffer << endl;
             // if same, move on
             // else if server is older by one character, resend
             // else if server is newer by one character, move on
-        }while (0);
+        }while (echoBuffer[strLen] != clientString[strLen]) ; 
 
 #ifdef DEBUG
         cout << endl;
