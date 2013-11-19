@@ -133,25 +133,6 @@ int updateIncarNum(void){
     // open the file as a filestream
     // since this is the failure mode, increment the incarnation number 
     int_incarNumber = getValueFromFile(filename) + 1;
-#ifdef UNUSED
-    ifstream infile( filename.c_str() );
-    string inString;
-
-    if( infile.fail() ) {
-#if SHOWERRORS
-        cout << "No file <" << filename << "> found; creating file with incarnation number = 0" 
-            << endl;
-#endif // SHOWERRORS
-    }else{
-        getline(infile, inString);
-#ifdef DEBUG
-        cout << "Incarnation Number = <" << inString << ">" << endl;
-#endif
-        if(inString.length() > 0)
-            int_incarNumber = atoi( inString.c_str() );
-
-    }
-#endif //UNUSED     
     // update the incarnation number to the new value
     ofstream outFile(filename.c_str() );
     outFile << (int_incarNumber ) << endl;
@@ -176,6 +157,8 @@ int main(int argc, char* argv[])//char  *argv[]
     unsigned int fromSize;           /* In-out of address size for recvfrom() */
     struct sockaddr_in fromAddr;     /* Source address of echo */
 	char clientString[strLen+1] = "     "; /* 5-element string belonging to the client */
+    bool resendFlag = 0;
+    int numChars = 0;               /* number of characters currently held in the client string */
     char echoBuffer[ECHOMAX+1];      /* Buffer for receiving echoed string */
     //int echoStringLen = strLen+1;               /* Length of string to echo */
     int respStringLen;               /* Length of received response */
@@ -226,29 +209,10 @@ int main(int argc, char* argv[])//char  *argv[]
         cout << "No client number supplied, using clientNum=0" << endl;
     }
 
-
     /* Create a datagram/UDP socket */
     if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
         DieWithError("socket() failed");
 
-    /* Construct the server address structure */
-  	memset(&echoServAddr, 0, sizeof(echoServAddr));    /* Zero out structure */
-      echoServAddr.sin_family = AF_INET;                 /* Internet addr family */
-      echoServAddr.sin_addr.s_addr = inet_addr(servIP);  /* Server IP address */
-      echoServAddr.sin_port   = htons(echoServPort);     /* Server port */
-
-#ifdef UNUSED
-
-#endif    	
-
-    strcpy(clientRequest.client_ip, getSocketIP() ); 
-
-	//print our IP address
-	printf("Client IP address = %s\n", clientRequest.client_ip);
-    cout << endl;
-    failurePoint = rand() % (MAX_REQUESTS) ; // the iteration at which failures wil begin with a probability of 50%
-    cout << "Client number " << clientNum << " will fail at iteration " << failurePoint+1 << endl;
- 
     // #################### MATT 
     //I came across setsockopt when looking for fcntl() examples 
     //the following will set a receive-time for the socket it is set to one second
@@ -257,15 +221,31 @@ int main(int argc, char* argv[])//char  *argv[]
     //I chose this because I could not figure out how to tell recvfrom() to stop
     //it seemed like it would hang waiting for server but ofcourse server was wating on
     //client 
-    /* TODO can't this setsockopt be moved outside any for loop, to
-     * just after the socket is instantiated?  Does it need to be set
-     * on each receive? */
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,sizeof(struct timeval));
 	
+    /* Construct the server address structure */
+  	memset(&echoServAddr, 0, sizeof(echoServAddr));    /* Zero out structure */
+      echoServAddr.sin_family = AF_INET;                 /* Internet addr family */
+      echoServAddr.sin_addr.s_addr = inet_addr(servIP);  /* Server IP address */
+      echoServAddr.sin_port   = htons(echoServPort);     /* Server port */
+
+    // put the IP address into the structure
+    strcpy(clientRequest.client_ip, getSocketIP() ); 
+
+	//print our IP address
+	printf("Client IP address = %s\n", clientRequest.client_ip);
+    cout << endl;
+    failurePoint = rand() % (MAX_REQUESTS) ; // the iteration at which failures will begin with a probability of 50%
+    cout << "Client number " << clientNum << " will fail at iteration " << failurePoint+1 << endl;
+ 
 
 	clientRequest.client = clientNum;
 	for(requestNum = 0; requestNum < MAX_REQUESTS ; ++requestNum)
 	{
+        // reset for next request
+        resendFlag = 0;
+
+        // pack client request struct
 		clientRequest.req = requestNum+1;
 		// randomize the char sent to the server
 		clientRequest.c   = (char) ( 97 + (rand() % 26) ); // 97 == ascii "a"
@@ -274,7 +254,7 @@ int main(int argc, char* argv[])//char  *argv[]
         // update the incarnation number if past the point of failure
         // get incarnation number by unlocking file, incrementing, and
         // closing file
-        // TODO should the client send data if it fails?
+        // client sends data even if it "fails"
         if((requestNum) >= failurePoint){
             // randomly calculate the failureProbability for each iteration 
             // past the failure point (0 to 1) 
@@ -290,6 +270,7 @@ int main(int argc, char* argv[])//char  *argv[]
                 clientRequest.inc = updateIncarNum();
                 // reset the client string to empty 5 char
                 strcpy(clientString, "     ");
+                numChars = 0;
             }else{
                 // failure did not happen, just get the current incarnation
                 // number
@@ -303,9 +284,16 @@ int main(int argc, char* argv[])//char  *argv[]
             clientRequest.inc = checkIncarNum();
         	 }
 
+        // update the client string with the new character, the same way the
+        // server should - only once per request  
+        updateClientString(clientString, clientRequest.c, strLen);
+        numChars = (numChars + 1) % strLen; // increase numChars up to a maximum of strLen
+        // purge the echoBuffer from the server for the next request
+        strcpy(echoBuffer, "     ");
+
+
         do{ // send and attempt to receive from the server until the server sends a valid acknowledgement
-            // TODO should the check for failure be inside this do-while?
-            //
+            // client does not check for failure inside this do-while
 #ifdef DEBUG
             printf("Client:: sending client data::\n");
             printRequestStructure(clientRequest);
@@ -313,61 +301,59 @@ int main(int argc, char* argv[])//char  *argv[]
 
             /* Send the string to the server */
             if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
-                        &echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
+                        &echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest)) {
                 DieWithError("sendto() sent a different number of bytes than expected");
-            // modify the string stored with the client
-            updateClientString(clientString, clientRequest.c, strLen);
-            cout << "Client sending to server : " << clientString << endl;
-#ifdef DEBUG
-            cout << "echoBuffer = " << echoBuffer << endl;
+            }
+
+#ifdef DEBUG  //display the string held by the client for comparison to the server string
+            cout << "Client string: "  << clientString <<  endl;
 #endif
 
-#ifdef DEBUG  //"String Received from server: "
-            cout << "Client string (stored by client):\t" << clientString <<  endl;
-#endif
-
-            // need to receive a response form the server to verify the packet was
-            // received??
 #ifdef RECEIVE_FROM_SERVER
-
-
-            /* Recv a response */
+            /* immedaitely try to receive a response from the server, verifying the last packet was
+             * received */
             /* TODO make this a function */
             fromSize = sizeof(fromAddr);		
             respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
                     (struct sockaddr *) &fromAddr, &fromSize);
 
-			//if respStringLen == -1 then nothing was received and we resend
+#ifdef DEBUG
+            cout << "Server string: " << echoBuffer << endl;
+#endif
+#ifdef RESEND_REQUEST
+            //if respStringLen == -1 then nothing was received and we resend
             //TODO currently only resending once - not suitable for server
             //that frequently fails i.e. more thant once ina row
-			if(respStringLen == -1) {// TODO this condition should be in the while()conditional at the end
-            /* TODO the while conditoin should also check the string returned
-            * by the server to see if it is the same as the string held by
-            * the client using a compareStrings() function, called immediately
-            * after a valid receive: 
-            * do
-            *   send
-            *   receive
-            *   if receive == -1
-            *       continue
-            *   if (serverString != clientString)
-            *       if server string older than client string
-            *           resend
-            *   else
-            *       break
-            * while(1) 
-            * */
-			
-				//continue;
-				cout << "resending Request number " << clientRequest.req << "<" << clientRequest.c << ">" << endl;
+            if(respStringLen == -1) {// TODO this condition should be in the while()conditional at the end
+                /* TODO the while conditoin should also check the string returned
+                 * by the server to see if it is the same as the string held by
+                 * the client using a compareStrings() function, called immediately
+                 * after a valid receive: 
+                 * do
+                 *   send
+                 *   receive
+                 *   if receive == -1
+                 *       continue
+                 *   if (serverString != clientString)
+                 *       if server string older than client string
+                 *           resend
+                 *   else
+                 *       break
+                 * while(1) 
+                 * */
 
-            	if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
-                        &echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
-                DieWithError("sendto() sent a different number of bytes than expected");
+                //continue;
+                cout << "resending Request number " << clientRequest.req << "<" << clientRequest.c << ">" << endl;
 
-				respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
+                if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
+                            &echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
+                    DieWithError("sendto() sent a different number of bytes than expected");
+
+                // check immediately if the server has replied
+                respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
                         (struct sockaddr *) &fromAddr, &fromSize);
-			}
+            }
+#endif
 
 #ifdef DEBUG
             cout << "Bytes Received = " << respStringLen << ", Bytes expected = " << sizeof(clientString) << endl;
@@ -376,46 +362,42 @@ int main(int argc, char* argv[])//char  *argv[]
             if ( respStringLen != sizeof(clientString) )
               DieWithError("recvfrom() failed");
 #endif
-            if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr)
-            {
+            if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr){
                 fprintf(stderr,"Error: received a packet from unknown source.\n");
                 exit(1);
             }
 
             /* null-terminate the received data */
             echoBuffer[respStringLen] = '\0';
-            printf("String Received from server:\t\t%s\n", echoBuffer);    /* Print the echoed arg */
-#endif // RECEIVE_FROM_SERVER
-
-            // put the client to sleep for a bit - should be an input argument
-            // in seconds or milliseconds would be better
-#ifdef DEBUG
-            cout << "Client: sleeping for "<< sleepTime << " us...." << endl;
-#endif
-
-           // if ( respStringLen != sizeof(clientString) )          
-            //usleep(sleepTime);
-	       // fcntl(sock, F_SETFL, O_NONBLOCK);//non_block sock
-            // TODO need to compare string of server ack to the string held by
-            // the client to determine if the client needs to resend data
-/*
-            if(strncmp(echoBuffer, clientString, strlen(clientString)))
-			{				 
-				cout << "strings are not the same" << endl;
-				if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
-                        &echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
-                DieWithError("sendto() sent a different number of bytes than expected");
-			}
-			else
-			{
-				cout << "strings match" << endl;
-				continue;
-			}
-*/
             // if same, move on
             // else if server is older by one character, resend
             // else if server is newer by one character, move on
-        }while (echoBuffer[strLen] != clientString[strLen]) ; 
+            if( (respStringLen == -1) ) {
+                // no packet received from the server, issue warning message
+                // and stay in while loop
+                resendFlag = 1;
+
+                // print error message
+                cout << "Client did not receive a response form the server, resending R=" 
+                    << requestNum+1 << "<" << clientRequest.c << ">..." << endl;
+                // put the client to sleep for a bit 
+#ifdef DEBUG
+                cout << "Client: sleeping for "<< sleepTime << " us...." << endl;
+#endif
+                usleep(sleepTime);
+            }else{ 
+#ifdef DEBUG
+    cout << "echoBuffer[0]=<" << echoBuffer[0] << 
+        ">, clientString[0]=<" << clientString[0] << ">" << endl;
+#endif
+                if( echoBuffer[0] == clientString[0] ) {
+                    // this is a valid receive - no reason to sleep or continue
+                    resendFlag = 0;
+                }
+            } 
+#endif // RECEIVE_FROM_SERVER
+
+        }while ( resendFlag ) ; 
 
 #ifdef DEBUG
         cout << endl;

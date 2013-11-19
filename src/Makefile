@@ -33,7 +33,7 @@ debug: client server
 
 run: debug all
 	clear
-	./server 65432
+	./server 65432 | tee output_server.tmp
 
 runclient: debug all 
-	./client 129.219.10.241 65432 0 
+	./client 129.219.10.241 65432 0 | tee output_client.tmp
