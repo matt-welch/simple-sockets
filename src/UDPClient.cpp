@@ -83,18 +83,18 @@ void receiveAckFromServer( int& sock, const struct sockaddr_in& echoServAddr ){
 int getValueFromFile(string filename){
     // open the file as a filestream
     // lock file access here
-//    struct flock flockStruct;//this struct will describe what type of lock 
-//	int fd = 0;				 //we need and we will pass the address in fcntl() call
-	/*build struct*/
-//	flockStruct.l_type   = F_WRLCK; //this is what type of lock in this case write-lock
-// 	flockStruct.l_whence = SEEK_SET; //start at beginning of file
-//	flockStruct.l_start  = 0; //offset for l_whence
-//	flockStruct.l_len    = 0; //length of of lock region; 0 = EOF
-//	flockStruct.l_pid    = getpid();      //get the process ID of process dealing with lock
+    struct flock flockStruct;//this struct will describe what type of lock 
+	int fd = 0;				 //we need and we will pass the address in fcntl() call
+   /*build struct*/
+	flockStruct.l_type   = F_WRLCK; //this is what type of lock in this case write-lock
+ 	flockStruct.l_whence = SEEK_SET; //start at beginning of file
+	flockStruct.l_start  = 0; //offset for l_whence
+	flockStruct.l_len    = 0; //length of of lock region; 0 = EOF
+	flockStruct.l_pid    = getpid();      //get the process ID of process dealing with lock
 
-//	fd = open("filename", O_WRONLY); //open file in write only mode
+	fd = open("filename", O_WRONLY); //open file in write only mode
 
-//	fcntl(fd, F_SETLKW, &flockStruct); //do the locking with fcntl
+	fcntl(fd, F_SETLKW, &flockStruct); //do the locking with fcntl
 
 
     ifstream infile( filename.c_str() );
@@ -122,8 +122,8 @@ int getValueFromFile(string filename){
     }
 
 	/*unlock file*/
-//	flockStruct.l_type = F_UNLCK; //change struct field to unlock 
-//	fcntl(fd, F_SETLK, &flockStruct); //unlock with fcntl()
+	flockStruct.l_type = F_UNLCK; //change struct field to unlock 
+	fcntl(fd, F_SETLK, &flockStruct); //unlock with fcntl()
 
     return int_incarNumber;
 }//end getValueFromFile
