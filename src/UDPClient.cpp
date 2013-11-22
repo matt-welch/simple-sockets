@@ -291,34 +291,38 @@ int main(int argc, char* argv[])//char  *argv[]
                 cout << " --> FAILURE!! " << endl;
 #endif
                 // failure occured, increment the current incarnation
-                clientRequest.inc = updateIncarNum();
+                otherIncNum = updateIncarNum();
+                myIncNum = otherIncNum;
+                
                 // reset the client string to empty 5 char
                 strcpy(clientString, "     ");
                 numChars = 0;
             }else{
                 // failure did not happen, just get the current incarnation
                 // number
+                // no failures yet, just check that nobody else has updated it
+                otherIncNum = checkIncarNum();
 #ifdef DEBUG
                 cout << " --> SUCCESS!! " << endl;
 #endif
-                otherIncNum = checkIncarNum();
-                if (otherIncNum != myIncNum){
-                    // another client has failed, this means I fail too.
-                    // reset the client string to empty 5 char
-#ifdef DEBUG
-                    cout << " --> OTHER CLIENT FAILURE!! " << endl;
-#endif
-                    strcpy(clientString, "     ");
-                    numChars = 0;
-                }
-                // update local and packet incarnation numbers
-                myIncNum = otherIncNum;
-                clientRequest.inc = otherIncNum;
             }
         }else{
             // no failures yet, just check that nobody else has updated it
-            clientRequest.inc = checkIncarNum();
+            otherIncNum = checkIncarNum();
         }
+
+        if (otherIncNum != myIncNum){
+            // another client has failed, this means I fail too.
+            // reset the client string to empty 5 char
+#ifdef DEBUG
+            cout << " --> OTHER CLIENT FAILURE!! " << endl;
+#endif
+            strcpy(clientString, "     ");
+            numChars = 0;
+        }
+        // update local and packet incarnation numbers
+        myIncNum = otherIncNum;
+        clientRequest.inc = otherIncNum;
 
         // update the client string with the new character, the same way the
         // server should - only once per request  
@@ -423,6 +427,7 @@ int main(int argc, char* argv[])//char  *argv[]
 #ifdef DEBUG
                     cout << "Client: sleeping for "<< sleepTime << " us...." << endl;
 #endif
+                    failureCount++;
                     usleep(sleepTime);
                 }else{ 
 #ifdef VERBOSE

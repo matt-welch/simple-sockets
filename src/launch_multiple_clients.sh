@@ -13,5 +13,6 @@ do
     CLIENTNUM=$i
     echo "Launching Client $CLIENTNUM, connecting to server at ${SERVER_IP}:${PORTNUM}"
     ./client $SERVER_IP $PORTNUM $CLIENTNUM > output_client_${CLIENTNUM}.tmp & 
+    sleep 1 
 done
 echo "All client operations running in background"
