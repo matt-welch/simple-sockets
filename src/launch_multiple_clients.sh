@@ -10,7 +10,7 @@ PORTNUM=65432
 SERVER_IP=${GENERAL1}
 for i in {1..5}
 do
-    CLIENTNUM=i
+    CLIENTNUM=$i
     echo "Launching Client $CLIENTNUM, connecting to server at ${SERVER_IP}:${PORTNUM}"
     ./client $SERVER_IP $PORTNUM $CLIENTNUM > output_client_${CLIENTNUM}.tmp & 
 done
