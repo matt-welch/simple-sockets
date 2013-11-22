@@ -3,34 +3,29 @@ simple-sockets
 
 Simple sockets client/server for CSE434: Networks
 
-Algorithm for client: 
-1) establish a connection to the server
-	socket(), sendto(), recvfrom()
-1a) determine the request number when failures will begin (rand(1-20))
-2) issue 20 requests to the server
-	2a) randomly select a character in the alphabet
-	2b) keep sending the request after a timeout until get a response
-	2c) begin failing after a random number of requests between 1 and 20 with
-		a failure probability of (p=0.5) 
-		2c1) failure is represented by incrementing the incarnation number
-		2c2) incarnation number is stored in a file which should be locked and
-			unlocked on accesses.
+To run, test, or play with the simple-sockets program complete the following:
 
-Algorithm for Server: 
-Server maintains a 5-character log of the last 5 requests 
+The program will require that you have two terminals open either both on the same machine or one on the current machine and another on a different machine connected to the same network. Once you have two terminal windows open navigate to the directory where the “Team-9.zip” files were extracted in both terminal windows.
 
-1) Establish a listening socket
-	maintain a table of the requests from each client 
-		map to vector of resuests?
-2) receive a connection from a client
-3) receive structure from the client 
-	3a) take the character received from the client and prepend it to the
-		server's string, discarding the last character in the string (rotate
-		characters)
-	3b) fail in two ways
-		3b1) drop the request without performing the request (10%)
-		3b2) perform the request and then drop the request (10%)
-		3b3) if no fail, print the client and the string to stdout
+Pick a terminal window and build the program by typing “make” (without quotes) at the command prompt and press enter. It does not matter what terminal you choose just pick one and it will build the program that will be used on both terminals.
+
+Now delegate one of your open terminal windows as the client and the other as the server. The commands will differ depending on whether the terminal is acting as the client or the server.
+
+In the server terminal window type “./UDPServer 65432” (without quotes) at the command prompt and press enter. A message will appear at the command prompt with an IP address followed by a 5-digit number. These numbers are needed for the next step so write them down if you can not see the server terminal window from the client terminal window. 
+
+In the client terminal window type “./UDPClient” (without quotes) and press the space bar then enter the IP address from the server window and press the space bar then enter the 5-digit number that follows the IP address from the server window.  For example if the server produced the message 
+“server is running on 253.234.21.5 12345” then you would type in the client window:
+./UDPClient 253.234.21 12345 
+
+Simple-sockets is now running.
+
+>>>>>>>>>>>>>>>>>>>>>> Some advanced options are below <<<<<<<<<<<<<<<<<<<<<<<<<
+
+In the server window to automatically build and start server on port 65432 type
+“make run” (without quotes) 
+
+To automatically start multiple clients: in the client window type “./launch_multiple_clients.sh” (without quotes)  ONLY AFTER you first edit the launch_multiple_clients.sh file as follows. 
+In your favorite text editor open  launch_multiple_clients.sh and change the SERVER_IP value to the IP address of the server (the IP address displayed in the message in the server terminal window)
 
 
-
+ 
