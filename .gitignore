@@ -23,3 +23,9 @@ tags
 # binaries for this program
 client
 server
+UDPClient
+UDPServer
+
+# output files created by the program
+output_client*.tmp
+output_server.tmp
