@@ -282,12 +282,12 @@ int main(int argc, char* argv[])//char  *argv[]
         }else{
             // no failures yet, just check that nobody else has updated it
             clientRequest.inc = checkIncarNum();
-        	 }
+        }
 
         // update the client string with the new character, the same way the
         // server should - only once per request  
         updateClientString(clientString, clientRequest.c, strLen);
-        numChars = (numChars + 1) % strLen; // increase numChars up to a maximum of strLen
+        numChars = (numChars) % (strLen) + 1; // increase numChars up to a maximum of strLen
         // purge the echoBuffer from the server for the next request
         strcpy(echoBuffer, "     ");
 
@@ -364,6 +364,9 @@ int main(int argc, char* argv[])//char  *argv[]
 #endif
             if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr){
                 fprintf(stderr,"Error: received a packet from unknown source.\n");
+                // TODO print out the server's IP if it's from an unknown
+                // source
+                // fprintf(stderr,"IP Address = %s\n", fromAddr.sin_addr.s_addr);
                 exit(1);
             }
 
@@ -386,18 +389,33 @@ int main(int argc, char* argv[])//char  *argv[]
 #endif
                 usleep(sleepTime);
             }else{ 
-#ifdef DEBUG
-    cout << "echoBuffer[0]=<" << echoBuffer[0] << 
-        ">, clientString[0]=<" << clientString[0] << ">" << endl;
+#ifdef VERBOSE
+                cout << "echoBuffer=  <" << echoBuffer   << ">" << endl;
+                cout << "clientString=<" << clientString << ">" << endl;
+                cout << "numChars=" << numChars << endl;
 #endif
-                if( echoBuffer[0] == clientString[0] ) {
-                    // this is a valid receive - no reason to sleep or continue
-                    resendFlag = 0;
-                }
-            } 
-#endif // RECEIVE_FROM_SERVER
+                for (int c = 0; c < numChars; c++) {
+#ifdef DEBUG
+                    printf("client char[%d] = %c\nserver char[%d] = %c\n", c, clientString[c], c, echoBuffer[c]);
+#endif
+                    resendFlag = (echoBuffer[c] != clientString[c]);
+                    if(resendFlag){// resendFlag=1 means a mismatch was found
+#ifdef DEBUG
+                        printf("ClientString =\t<%s>\n",clientString );
+                        printf("EchoBuffer =\t<%s>\n", echoBuffer);
+                        printf("Client:: Mismatch found at char[%d] <%c> != <%c>\n", c, echoBuffer[c], clientString[c]);
+#endif
+                        break; 
+                    }
+                }            
+                // this is a valid receive - no reason to sleep or continue
+            }
+         
 
+#endif // BUGFIXING
         }while ( resendFlag ) ; 
+        // TODO need to add MAX_ITERATIONS to allow while loop and client to
+        // end if server doesn't respond
 
 #ifdef DEBUG
         cout << endl;
@@ -405,6 +423,6 @@ int main(int argc, char* argv[])//char  *argv[]
 	}//end for
 
     close(sock);
-    cout << "Client Program terminated. " << endl;
+    printf("Client Program completed %d request iterations.\n", MAX_REQUESTS );
     exit(0);
 }//end main

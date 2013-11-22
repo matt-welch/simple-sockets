@@ -22,7 +22,7 @@ clean:
 	ctags --c-kinds=+defglmpstux -R
 
 tidy: clean
-	rm -f *.*~ *~
+	rm -f *.*~ *~ *.tmp
 
 
 DEBUG_FLAGS = -g3 -ggdb -O0 -Wall -pedantic -DDEBUG
