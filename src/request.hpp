@@ -1,9 +1,17 @@
-///////////////////////////////////////////////////
-// header file for client and server 
-// 
-//
-//
-//////////////////////////////////////////////////
+/* **************************************************************************
+ * FILENAME:    request.hpp
+ * NAME:        common header file for simple-sockets client and server
+ * AUTHORS:     Jesse Quale, Matt Welch
+ * SCHOOL:      Arizona State University
+ * CLASS:       CSE434: Introduction to Networks
+ * INSTRUCTOR:  Dr. Violet Syrotiuk
+ * SECTION:     71101
+ * TERM:        Fall 2013
+ * DESCRIPTION: 
+ *      This is the common header file for the client and server of the
+ *      simple-sockets UDP socket program.  It contains definitions common to
+ *      both the header and client.  
+ * */
 
 /* common libraries to server and client */
 #include <stdio.h>      /* for printf() and fprintf() */
@@ -20,18 +28,22 @@ using std::string;
 #include <sys/types.h>
 
 #define ACK_TO_CLIENT 1
+#define ECHOMAX 6     /* Longest string to echo. This should be dependent on strLen*/
 // variables common to the server and client
 const short strLen = 5;
 
+// request structure that will be sent form the client to the server
 typedef struct request
 {
-        char client_ip[16];  //to hold client IP address in dotted decimal
-        int inc;             //incarnation number of client
-        int client;          //client number
-	int req;             //request number
-        char c;              //random char client sends to server
+    char client_ip[16];  //to hold client IP address in dotted decimal
+    int inc;             //incarnation number of client
+    int client;          //client number
+    int req;             //request number
+    char c;              //random char client sends to server
 }request_t;
 
+// request data struct that the server stores in s vector to keep track of the
+// client requests
 typedef struct compact_request_data{
     int req;    /* client request number */
     char clientString[strLen+1]; /* current client string held by the server */
@@ -40,7 +52,8 @@ typedef struct compact_request_data{
 char addressBuffer[INET_ADDRSTRLEN]; //INET_ADDRSTRLEN = 16
 char addressStr[INET_ADDRSTRLEN]; //INET_ADDRSTRLEN = 16
 
-void DieWithError(const char *errorMessage) /* External error handling function */
+/* External error handling function */
+void DieWithError(const char *errorMessage) 
 {
     perror(errorMessage);
     exit(1);
@@ -55,8 +68,6 @@ char* showSocketIP(struct sockaddr_in& host_addr){
 #endif
     return addressStr;
 }
-
-
 
 // function to get the IP address in use by a socket
 char* getSocketIP()
@@ -85,16 +96,17 @@ char* getSocketIP()
     return NULL;
 }
 
+// function copies characters from left to right (0= left) so that the
+// newer character may be placed in myString[0]
 void updateClientString(char* myString, char c, int len){
-    // function copies characters from left to right (0= left) so that the
-    // newer character may be placed in myString[0]
-	for (int i = len-1; i > 0; i--) {// terminates when i=1, copying myString[0] to myString[1]
-		myString[i] = myString[i-1];
+    for (int i = len-1; i > 0; i--) {// terminates when i=1, copying myString[0] to myString[1]
+        myString[i] = myString[i-1];
     }
-	myString[0] = c;
-	return;
+    myString[0] = c;
+    return;
 }
 
+// function for printing out the contents of each packet structure
 void printRequestStructure(request_t clientRequest){
     printf("\tclientRequest.client_ip(char*)\t= %s\n", clientRequest.client_ip);
     printf("\tclientRequest.inc (int)\t\t= %d\n", clientRequest.inc);
@@ -103,5 +115,3 @@ void printRequestStructure(request_t clientRequest){
     printf("\tclientRequest.c (char)\t\t= %c\n", clientRequest.c);
 }
 
-// the following are likely unused
-#define ECHOMAX 6     /* Longest string to echo */

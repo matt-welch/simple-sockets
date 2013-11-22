@@ -2,10 +2,10 @@
  * FILENAME:    UDPClient.cpp
  * NAME:        UDP Simple Sockets client program
  * AUTHORS:     Jesse Quale, Matt Welch
- * SCHOOL:      Arizona Statte University
+ * SCHOOL:      Arizona State University
  * CLASS:       CSE434: Introduction to Networks
  * INSTRUCTOR:  Dr. Violet Syrotiuk
- * SECTION:     
+ * SECTION:     71101
  * TERM:        Fall 2013
  * DESCRIPTION: 
  *      This program is the client-side of a simple UDP sockets based
@@ -15,13 +15,12 @@
  * is to keep track of the last five characters of the exchange and a table of
  * the client requests so that it can resend responses and service requests
  * based on simulated failure modes of both the client and the server.  The
- * algorithm of this eschange is more fully described in the README.MD.  
+ * algorithm of this exchange is more fully described in the README.MD.  
  * */
 
-// TODO replace c-libraries with C++ libraries
 #include "request.hpp"  // header
 #include <time.h>
-#include <unistd.h> // for usleep TODO nanosleep is better
+#include <unistd.h> 
 
 //for getting ip info
 #include <net/if.h>
@@ -39,46 +38,14 @@ using std::istream;
 using std::getline;
  
 
-
-
-
 #include <fstream>
 using namespace std;
 
-#define SHOWERRORS 1
 #if ACK_TO_CLIENT
     #define RECEIVE_FROM_SERVER 1
 #endif
 
-//#define DEBUG 1
-//-----------------------------------------------------
-void receiveAckFromServer( int& sock, const struct sockaddr_in& echoServAddr ){
-    unsigned int fromSize;           /* In-out of address size for recvfrom() */
-    int respStringLen;               /* Length of received response */
-    struct sockaddr_in fromAddr;     /* Source address of echo */
-    char echoBuffer[ECHOMAX+1];      /* Buffer for receiving echoed string */
-
-    /* Recv a response */
-    fromSize = sizeof(fromAddr);
-    respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0, (struct sockaddr *) &fromAddr, &fromSize);
-#ifdef DEBUG
-    cout << "Bytes Received = " << respStringLen << ", Bytes expected = " << strLen+1 << endl;
-#endif
-    if ( respStringLen != strLen+1 )
-        DieWithError("recvfrom() failed");
-
-    if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr)
-    {
-        fprintf(stderr,"Error: received a packet from unknown source.\n");
-        exit(1);
-    }
-
-    /* null-terminate the received data */
-    echoBuffer[respStringLen] = '\0';
-    printf("String Received from server:\t\t%s\n", echoBuffer);    /* Print the echoed arg */
-
-
-}
+#define DEBUG 1
 
 int getValueFromFile(string filename){
     // open the file as a filestream
@@ -128,8 +95,7 @@ int getValueFromFile(string filename){
     return int_incarNumber;
 }//end getValueFromFile
 
-// function to check on the incarnation number.  If it is different than the
-// currently held number, call updateIncarNum() and return the updated value.
+// function to check on the incarnation number. 
 int checkIncarNum(void){
     string filename = "inc.txt";
     string str_incarNumber;
@@ -140,8 +106,7 @@ int checkIncarNum(void){
     return(int_incarNumber);
 }
 
-// the number 
-// function unlocks file containing last incarnation number and gets a new
+// function unlocks file containing last incarnation number and gets a new one
 int updateIncarNum(void){
     string filename = "inc.txt";
     string str_incarNumber;
@@ -176,7 +141,7 @@ int updateIncarNum(void){
 	fcntl(fd, F_SETLK, &flockStruct); //unlock with fcntl()
 
     return(int_incarNumber);
-}//end updateInc
+}//end updateIncarNum
 
 int main(int argc, char* argv[])//char  *argv[]
 {
@@ -200,7 +165,6 @@ int main(int argc, char* argv[])//char  *argv[]
     bool resendFlag = 0;
     int numChars = 0;               /* number of characters currently held in the client string */
     char echoBuffer[ECHOMAX+1];      /* Buffer for receiving echoed string */
-    //int echoStringLen = strLen+1;               /* Length of string to echo */
     int respStringLen;               /* Length of received response */
 #endif // RECEIVE_FROM_SERVER
 
@@ -231,7 +195,6 @@ int main(int argc, char* argv[])//char  *argv[]
 
     servIP = argv[1];           /* First arg: server IP address (dotted quad) */
     echoServPort = atoi(argv[2]);  /* Use given port */
-    //echoServPort = 65432;  /* experimental port range port as default */
     if ( argc > 3) {
         // client number has been supplied as the third command line argument
         clientNum = atoi(argv[3]); 
@@ -253,14 +216,11 @@ int main(int argc, char* argv[])//char  *argv[]
     if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
         DieWithError("socket() failed");
 
-    // #################### MATT 
-    //I came across setsockopt when looking for fcntl() examples 
-    //the following will set a receive-time for the socket it is set to one second
-    //from line 188; if there is not packet received after 'tv' amount of time the 
-    //the control-flow moves to next line. 
-    //I chose this because I could not figure out how to tell recvfrom() to stop
-    //it seemed like it would hang waiting for server but ofcourse server was wating on
-    //client 
+    // the following will set a receive-time for the socket it is set to one second
+    // from line 188; if there is not packet received after 'tv' amount of time the 
+    // the control-flow moves to next line. 
+    // This was chosen because it is easier to tell the socket to timeout and
+    // prevent the client and server from hanging.
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv,sizeof(struct timeval));
 	
     /* Construct the server address structure */
@@ -271,7 +231,6 @@ int main(int argc, char* argv[])//char  *argv[]
 
     // put the IP address into the structure
     strcpy(clientRequest.client_ip, getSocketIP() ); 
-//    strcpy(clientRequest.client_ip, showSocketIP() ); 
 
 	//print our IP address
 	printf("Client IP address = %s\n", clientRequest.client_ip);
@@ -369,7 +328,6 @@ int main(int argc, char* argv[])//char  *argv[]
 #ifdef RECEIVE_FROM_SERVER
             /* immedaitely try to receive a response from the server, verifying the last packet was
              * received */
-            /* TODO make this a function */
             fromSize = sizeof(fromAddr);		
             respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
                     (struct sockaddr *) &fromAddr, &fromSize);
@@ -377,48 +335,11 @@ int main(int argc, char* argv[])//char  *argv[]
 #ifdef DEBUG
             cout << "Server string: " << echoBuffer << endl;
 #endif
-#ifdef RESEND_REQUEST
-            //if respStringLen == -1 then nothing was received and we resend
-            //TODO currently only resending once - not suitable for server
-            //that frequently fails i.e. more thant once ina row
-            if(respStringLen == -1) {// TODO this condition should be in the while()conditional at the end
-                /* TODO the while conditoin should also check the string returned
-                 * by the server to see if it is the same as the string held by
-                 * the client using a compareStrings() function, called immediately
-                 * after a valid receive: 
-                 * do
-                 *   send
-                 *   receive
-                 *   if receive == -1
-                 *       continue
-                 *   if (serverString != clientString)
-                 *       if server string older than client string
-                 *           resend
-                 *   else
-                 *       break
-                 * while(1) 
-                 * */
 
-                //continue;
-                cout << "resending Request number " << clientRequest.req << "<" << clientRequest.c << ">" << endl;
 
-                if (sendto(sock, &clientRequest, sizeof(clientRequest), 0, (struct sockaddr *)
-                            &echoServAddr, sizeof(echoServAddr)) != sizeof(clientRequest))
-                    DieWithError("sendto() sent a different number of bytes than expected");
-
-                // check immediately if the server has replied
-                respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0,
-                        (struct sockaddr *) &fromAddr, &fromSize);
-            }
-#endif
-
-#ifdef DEBUG
+#ifdef VERBOSE
             cout << "Bytes Received = " << respStringLen << ", Bytes expected = " << sizeof(clientString) << endl;
             showSocketIP(fromAddr);
-#endif
-#ifdef EXIT_ON_RECV_FAIL
-            if ( respStringLen != sizeof(clientString) )
-              DieWithError("recvfrom() failed");
 #endif
             if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr){
                 fprintf(stderr,"Error: received a packet from unknown source.\n");
@@ -453,12 +374,12 @@ int main(int argc, char* argv[])//char  *argv[]
                     cout << "numChars=" << numChars << endl;
 #endif
                     for (int c = 0; c < numChars; c++) {
-#ifdef DEBUG
+#ifdef VERBOSE
                         printf("client char[%d] = %c\nserver char[%d] = %c\n", c, clientString[c], c, echoBuffer[c]);
 #endif
                         resendFlag = (echoBuffer[c] != clientString[c]);
                         if(resendFlag){// resendFlag=1 means a mismatch was found
-#ifdef DEBUG
+#ifdef VERBOSE
                             printf("ClientString =\t<%s>\n",clientString );
                             printf("EchoBuffer =\t<%s>\n", echoBuffer);
                             printf("Client:: Mismatch found at char[%d] <%c> != <%c>\n", c, echoBuffer[c], clientString[c]);
@@ -472,14 +393,13 @@ int main(int argc, char* argv[])//char  *argv[]
                 }
             }
          
+            // if failureCount exceeds MAX_SERVER_FAILURES exit client
             if(failureCount > MAX_SERVER_FAILURES){
                 printf("CLIENT: server has failed to send an ACK greater than %d times, client aborting...\n", MAX_SERVER_FAILURES);
                 exit(1);   
             }
-#endif // BUGFIXING
+#endif // RECEIVE_FROM_SERVER
         }while ( resendFlag  ) ; 
-        // TODO need to add MAX_ITERATIONS to allow while loop and client to
-        // end if server doesn't respond
 
 #ifdef DEBUG
         cout << endl;
@@ -487,6 +407,6 @@ int main(int argc, char* argv[])//char  *argv[]
 	}//end for
 
     close(sock);
-    printf("Client Program completed %d request iterations.\n", MAX_REQUESTS );
+    printf("UDPClient program successfully completed %d request iterations.\n", MAX_REQUESTS );
     exit(0);
 }//end main
