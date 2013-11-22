@@ -153,7 +153,11 @@ int main(int argc, char* argv[])//char  *argv[]
     int failurePoint;                /* the iteration at which failures may begin */
     float failureProbability = 0.0;  /* probability of failure past failurePoint */
     const float chanceOfFailure = 0.5; 
+    int myIncNum = 0;               /* local copy of the incarnation number */
+    int otherIncNum = 0;            /* copy of the incarnation number retreived from the file */
 #ifdef RECEIVE_FROM_SERVER  
+    int failureCount = 0;
+    const int MAX_SERVER_FAILURES = 20;
     unsigned int fromSize;           /* In-out of address size for recvfrom() */
     struct sockaddr_in fromAddr;     /* Source address of echo */
 	char clientString[strLen+1] = "     "; /* 5-element string belonging to the client */
@@ -231,6 +235,7 @@ int main(int argc, char* argv[])//char  *argv[]
 
     // put the IP address into the structure
     strcpy(clientRequest.client_ip, getSocketIP() ); 
+//    strcpy(clientRequest.client_ip, showSocketIP() ); 
 
 	//print our IP address
 	printf("Client IP address = %s\n", clientRequest.client_ip);
@@ -277,7 +282,19 @@ int main(int argc, char* argv[])//char  *argv[]
 #ifdef DEBUG
                 cout << " --> SUCCESS!! " << endl;
 #endif
-                clientRequest.inc = checkIncarNum();
+                otherIncNum = checkIncarNum();
+                if (otherIncNum != myIncNum){
+                    // another client has failed, this means I fail too.
+                    // reset the client string to empty 5 char
+#ifdef DEBUG
+                    cout << " --> OTHER CLIENT FAILURE!! " << endl;
+#endif
+                    strcpy(clientString, "     ");
+                    numChars = 0;
+                }
+                // update local and packet incarnation numbers
+                myIncNum = otherIncNum;
+                clientRequest.inc = otherIncNum;
             }
         }else{
             // no failures yet, just check that nobody else has updated it
@@ -357,6 +374,7 @@ int main(int argc, char* argv[])//char  *argv[]
 
 #ifdef DEBUG
             cout << "Bytes Received = " << respStringLen << ", Bytes expected = " << sizeof(clientString) << endl;
+            showSocketIP(fromAddr);
 #endif
 #ifdef EXIT_ON_RECV_FAIL
             if ( respStringLen != sizeof(clientString) )
@@ -364,56 +382,61 @@ int main(int argc, char* argv[])//char  *argv[]
 #endif
             if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr){
                 fprintf(stderr,"Error: received a packet from unknown source.\n");
-                // TODO print out the server's IP if it's from an unknown
-                // source
-                // fprintf(stderr,"IP Address = %s\n", fromAddr.sin_addr.s_addr);
-                exit(1);
-            }
+                showSocketIP(fromAddr);
+                failureCount++;
+                resendFlag=1;
+            }else{
 
-            /* null-terminate the received data */
-            echoBuffer[respStringLen] = '\0';
-            // if same, move on
-            // else if server is older by one character, resend
-            // else if server is newer by one character, move on
-            if( (respStringLen == -1) ) {
-                // no packet received from the server, issue warning message
-                // and stay in while loop
-                resendFlag = 1;
+                /* null-terminate the received data */
+                echoBuffer[respStringLen] = '\0';
+                // if same, move on
+                // else if server is older by one character, resend
+                // else if server is newer by one character, move on
+                if( (respStringLen == -1) ) {
+                    // no packet received from the server, issue warning message
+                    // and stay in while loop
+                    resendFlag = 1;
 
-                // print error message
-                cout << "Client did not receive a response form the server, resending R=" 
-                    << requestNum+1 << "<" << clientRequest.c << ">..." << endl;
-                // put the client to sleep for a bit 
+                    // print error message
+                    cout << "Client did not receive a response form the server, resending R=" 
+                        << requestNum+1 << "<" << clientRequest.c << ">..." << endl;
+                    // put the client to sleep for a bit 
 #ifdef DEBUG
-                cout << "Client: sleeping for "<< sleepTime << " us...." << endl;
+                    cout << "Client: sleeping for "<< sleepTime << " us...." << endl;
 #endif
-                usleep(sleepTime);
-            }else{ 
+                    usleep(sleepTime);
+                }else{ 
 #ifdef VERBOSE
-                cout << "echoBuffer=  <" << echoBuffer   << ">" << endl;
-                cout << "clientString=<" << clientString << ">" << endl;
-                cout << "numChars=" << numChars << endl;
+                    cout << "echoBuffer=  <" << echoBuffer   << ">" << endl;
+                    cout << "clientString=<" << clientString << ">" << endl;
+                    cout << "numChars=" << numChars << endl;
 #endif
-                for (int c = 0; c < numChars; c++) {
+                    for (int c = 0; c < numChars; c++) {
 #ifdef DEBUG
-                    printf("client char[%d] = %c\nserver char[%d] = %c\n", c, clientString[c], c, echoBuffer[c]);
+                        printf("client char[%d] = %c\nserver char[%d] = %c\n", c, clientString[c], c, echoBuffer[c]);
 #endif
-                    resendFlag = (echoBuffer[c] != clientString[c]);
-                    if(resendFlag){// resendFlag=1 means a mismatch was found
+                        resendFlag = (echoBuffer[c] != clientString[c]);
+                        if(resendFlag){// resendFlag=1 means a mismatch was found
 #ifdef DEBUG
-                        printf("ClientString =\t<%s>\n",clientString );
-                        printf("EchoBuffer =\t<%s>\n", echoBuffer);
-                        printf("Client:: Mismatch found at char[%d] <%c> != <%c>\n", c, echoBuffer[c], clientString[c]);
+                            printf("ClientString =\t<%s>\n",clientString );
+                            printf("EchoBuffer =\t<%s>\n", echoBuffer);
+                            printf("Client:: Mismatch found at char[%d] <%c> != <%c>\n", c, echoBuffer[c], clientString[c]);
 #endif
-                        break; 
-                    }
-                }            
-                // this is a valid receive - no reason to sleep or continue
+                            failureCount++;
+                            break; 
+                        }
+                    }            
+                    // this is a valid receive - no reason to sleep or continue
+                    failureCount=0;
+                }
             }
          
-
+            if(failureCount > MAX_SERVER_FAILURES){
+                printf("CLIENT: server has failed to send an ACK greater than %d times, client aborting...\n", MAX_SERVER_FAILURES);
+                exit(1);   
+            }
 #endif // BUGFIXING
-        }while ( resendFlag ) ; 
+        }while ( resendFlag  ) ; 
         // TODO need to add MAX_ITERATIONS to allow while loop and client to
         // end if server doesn't respond
 

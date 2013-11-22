@@ -293,6 +293,7 @@ int main(int argc, char *argv[])
 #ifdef DEBUG
 		printf("Server:: received client data::\n");
         printRequestStructure(clientRequest);
+        showSocketIP(echoClntAddr);
 #endif
         //fail 1 do nothing
         //fail 2 add data to table but no send response
@@ -303,6 +304,7 @@ int main(int argc, char *argv[])
 #ifdef DEBUG
             cout << "Server: Normal operation: handling client data and sending ack to client" << endl;
             printf( "Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr) );
+            showSocketIP(echoClntAddr);
 #endif
             returnCode =  handleClientDataCompact(clientTable, clientRequest, newString);
             strcpy(clientString, newString.c_str() );

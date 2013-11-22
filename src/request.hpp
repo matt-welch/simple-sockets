@@ -38,6 +38,7 @@ typedef struct compact_request_data{
 }request_data_t;
 
 char addressBuffer[INET_ADDRSTRLEN]; //INET_ADDRSTRLEN = 16
+char addressStr[INET_ADDRSTRLEN]; //INET_ADDRSTRLEN = 16
 
 void DieWithError(const char *errorMessage) /* External error handling function */
 {
@@ -45,6 +46,19 @@ void DieWithError(const char *errorMessage) /* External error handling function 
     exit(1);
 }
 
+// function to get the IP address out of a sockaddr_in structure
+char* showSocketIP(struct sockaddr_in& host_addr){
+    strcpy(addressStr, inet_ntoa(host_addr.sin_addr));
+#ifdef DEBUG
+    printf("showSocketIP: IP addr: %s\n", addressStr);
+    printf("showSocketIP: port is: %d\n", (int) ntohs(host_addr.sin_port));
+#endif
+    return addressStr;
+}
+
+
+
+// function to get the IP address in use by a socket
 char* getSocketIP()
 {
     struct ifaddrs* ifAddress = NULL; //struct used to store network info from getifaddrs
