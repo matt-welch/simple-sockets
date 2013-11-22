@@ -85,9 +85,9 @@ int getValueFromFile(string filename){
     // lock file access here
     struct flock flockStruct;//this struct will describe what type of lock 
 	int fd = 0;				 //we need and we will pass the address in fcntl() call
-	/*build struct*/
+   /*build struct*/
 	flockStruct.l_type   = F_WRLCK; //this is what type of lock in this case write-lock
-    flockStruct.l_whence = SEEK_SET; //start at beginning of file
+ 	flockStruct.l_whence = SEEK_SET; //start at beginning of file
 	flockStruct.l_start  = 0; //offset for l_whence
 	flockStruct.l_len    = 0; //length of of lock region; 0 = EOF
 	flockStruct.l_pid    = getpid();      //get the process ID of process dealing with lock
@@ -151,13 +151,30 @@ int updateIncarNum(void){
     //pthread_mutex_lock(&g_lock_incarnationFile);
     // open the file as a filestream
     // since this is the failure mode, increment the incarnation number 
+	struct flock flockStruct;//this struct will describe what type of lock 
+	int fd = 0;				 //we need and we will pass the address in fcntl() call
+	/*build struct*/
+	flockStruct.l_type   = F_WRLCK; //this is what type of lock in this case write-lock
+    flockStruct.l_whence = SEEK_SET; //start at beginning of file
+	flockStruct.l_start  = 0; //offset for l_whence
+	flockStruct.l_len    = 0; //length of of lock region; 0 = EOF
+	flockStruct.l_pid    = getpid();      //get the process ID of process dealing with lock
+
+	fd = open("filename", O_WRONLY); //open file in write only mode
+
+	fcntl(fd, F_SETLKW, &flockStruct); //do the locking with fcntl
+     
+	//make changes to file
     int_incarNumber = getValueFromFile(filename) + 1;
     // update the incarnation number to the new value
     ofstream outFile(filename.c_str() );
     outFile << (int_incarNumber ) << endl;
     outFile.close();
 
-    //pthread_mutex_unlock(&g_lock_incarnationFile);
+	/*unlock file*/
+	flockStruct.l_type = F_UNLCK; //change struct field to unlock 
+	fcntl(fd, F_SETLK, &flockStruct); //unlock with fcntl()
+
     return(int_incarNumber);
 }//end updateInc
 
