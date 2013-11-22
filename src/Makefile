@@ -22,7 +22,7 @@ clean:
 	ctags --c-kinds=+defglmpstux -R
 
 tidy: clean
-	rm -f *.*~ *~
+	rm -f *.*~ *~ *.tmp
 
 
 DEBUG_FLAGS = -g3 -ggdb -O0 -Wall -pedantic -DDEBUG
@@ -31,5 +31,9 @@ CONFIG		= -Wall -pedantic
 debug: CONFIG=$(DEBUG_FLAGS)
 debug: client server
 
-run: debug server client
-	./server 65432
+run: debug all
+	clear
+	./server 65432 | tee output_server.tmp
+
+runclient: debug all 
+	./client 129.219.10.241 65432 0 | tee output_client.tmp

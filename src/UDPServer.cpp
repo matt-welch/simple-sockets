@@ -28,6 +28,7 @@ using std::cout;
 using std::endl;
 using std::cin;
 
+#define VERBOSE 1
 #define DEBUG 1
 #define STORE_CLIENT_DATA 1
 #define STORE_WITH_FUNCTION 1
@@ -51,8 +52,6 @@ void ackToClient(const int& sock, const char* clientString, const struct sockadd
 
 // function to handle the client request by looking up and/or storing in the
 // client table
-// TODO this function should not return the newString, but should take it as
-// an input argument reference like the table and request
 int handleClientData( client_table_t& clientTable, request_t& clientRequest, string& newString){
     client_data_t clientVector;
     stringstream clientKey;
@@ -70,7 +69,7 @@ int handleClientData( client_table_t& clientTable, request_t& clientRequest, str
     cout << "ClientKey = " << clientKey.str() << endl;
 #endif
     requestNum = clientRequest.req; 
-
+    
     /* determine if the clientTable already has data from this client */
     client_table_t::iterator table_it= clientTable.find(clientKey.str());
 
@@ -82,11 +81,17 @@ int handleClientData( client_table_t& clientTable, request_t& clientRequest, str
 #endif
         // copy in the new string (one character)
         newString = clientRequest.c;
+
         returnCode = 1;
     }else{// client data found, get it from the table and add the new string
         // get the client data from the table
         clientVector = table_it->second; //clientTable[clientKey.str()];
         numRecords = clientVector.size();
+        // TODO request num of the client cannot be the length of the vector
+        // if it is, then a client that crashes will have a short vector,
+        // but high request numbers so if it resends its char, the server
+        // could just add the same char to the clientString
+
 
         if ( requestNum > numRecords ) {
             // R > r  // assumed to be the common case so it's first
@@ -130,6 +135,93 @@ int handleClientData( client_table_t& clientTable, request_t& clientRequest, str
     return returnCode; 
 }
 
+int handleClientDataCompact( compact_table_t& clientTable, request_t& clientRequest, string& newString){
+    compact_data_t clientVector;
+    stringstream clientKey;
+	char clientString[strLen+1] = "     ";			 /* 5-element string belonging to the client */
+    int returnCode = -1;
+    int numRecords = 0;
+    int requestNum = 0;
+
+    // assemble the client key string from the components of the clients request
+    clientKey.str(""); // clear the key 
+    // assemble the key
+    clientKey << clientRequest.client_ip << "_" << clientRequest.client << "_"
+        << clientRequest.inc;
+#ifdef DEBUG
+    cout << "ClientKey = " << clientKey.str() << endl;
+#endif
+    requestNum = clientRequest.req; 
+    
+    /* determine if the clientTable already has data from this client */
+    compact_table_t::iterator table_it= clientTable.find(clientKey.str());
+
+    if(table_it == clientTable.end()) {// no entry found, create new
+#ifdef DEBUG
+        cout << "Client key <" << clientKey.str() << 
+            "> not found in the table, creating new entry:" << 
+            "< " << clientKey.str() << ", '" << clientRequest.c << "' >" << endl;
+#endif
+        // copy in the new string (one character)
+        newString = clientRequest.c;
+        //strcpy(compactString, (const char) clientRequest.c);
+
+        returnCode = 1;
+    }else{// client data found, get it from the table and add the new string
+        // get the client data from the table
+        clientVector = table_it->second; //clientTable[clientKey.str()];
+        numRecords = clientVector.back().req;
+        // TODO request num of the client cannot be the length of the vector
+        // if it is, then a client that crashes will have a short vector,
+        // but high request numbers so if it resends its char, the server
+        // could just add the same char to the clientString
+
+
+        if ( requestNum > numRecords ) {
+            // R > r  // assumed to be the common case so it's first
+            /* new request store the record in the table, send the response*/
+#ifdef DEBUG
+        printf("Server:: handleClientDataCompact():: %d > %d, storing response\n", requestNum, numRecords ); 
+#endif
+            // copy the last string from the table to the client String
+            strcpy( clientString, clientVector.back().clientString );
+            // modify the string stored with the client
+            updateClientString(clientString, clientRequest.c, strLen);
+            // create a new string to add to the client data
+            newString = clientString;
+            returnCode = 1;
+
+        }else if( requestNum == numRecords ){
+            // R == r
+            // send the stored repsonse to the client
+#ifdef DEBUG
+        printf("Server:: handleClientDataCompact():: %d == %d, sending stored response\n", requestNum, numRecords ); 
+#endif
+            newString = clientVector.back().clientString;
+            returnCode = 0;
+        }else{
+            // R < r
+#ifdef DEBUG
+        printf("Server:: handleClientDataCompact():: %d < %d, old request, don't store\n", requestNum, numRecords ); 
+#endif
+            // the request is old, ignore it and do not send the response
+            returnCode = -1;
+        }
+    }
+    if(returnCode > 0){
+        // push the updated string onto the client data
+        request_data_t newData;
+        strcpy(newData.clientString, newString.c_str());
+        newData.req = clientRequest.req;
+        clientVector.push_back(newData);
+        // update the client table with new string
+        clientTable[clientKey.str()] = clientVector;
+    }
+   
+    // return code based on old/recent/new data  {-1, 0, 1} 
+    return returnCode; 
+}
+
 int main(int argc, char *argv[])
 {
     int sock;                        /* Socket */
@@ -143,6 +235,7 @@ int main(int argc, char *argv[])
     client_data_t clientVector;
     string newString;
 	int fp, failureProbability = 0;
+    int totalPossibilities = 10;
     int returnCode = -1;
 
 	/* random seed */
@@ -150,7 +243,7 @@ int main(int argc, char *argv[])
 
 	/* variables to contain data sent from client and the table of client data */
 	request_t clientRequest;
-	client_table_t clientTable;
+	compact_table_t clientTable;
     if (argc != 2)         /* Test for correct number of parameters */
     {
         fprintf(stderr,"Usage:  %s <UDP SERVER PORT>\n", argv[0]);
@@ -162,6 +255,14 @@ int main(int argc, char *argv[])
     /* display the server's IP address  */
     cout << "Server is running at " << getSocketIP() << ":" << echoServPort << endl;
 
+#ifdef DEBUG
+        cout << "Server is set to fail 2/" << totalPossibilities << " of the time, is that ok??" << endl;
+        string response;
+        cin >> response; 
+        if ( response.compare("N") == 0 || response.compare("n") == 0 )
+            exit(1);
+        cout << "Server running with failure rate = 2/" << totalPossibilities << "...." << endl;
+#endif
     /* Create socket for sending/receiving datagrams */
     if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
         DieWithError("socket() failed");
@@ -180,7 +281,7 @@ int main(int argc, char *argv[])
     {
         // randomly calculate the failureProbability for each iteration 
         // past the failure point (0 to 10) 
-        failureProbability = rand() % 10;
+        failureProbability = rand() % totalPossibilities;
 
         /* Set the size of the in-out parameter */
         cliAddrLen = sizeof(echoClntAddr);
@@ -203,12 +304,15 @@ int main(int argc, char *argv[])
             cout << "Server: Normal operation: handling client data and sending ack to client" << endl;
             printf( "Handling client %s\n", inet_ntoa(echoClntAddr.sin_addr) );
 #endif
-            returnCode =  handleClientData(clientTable, clientRequest, newString);
+            returnCode =  handleClientDataCompact(clientTable, clientRequest, newString);
             strcpy(clientString, newString.c_str() );
             if (returnCode < 0) {
                 // clientRequest.req < last_stored_req
                 // data is old, do not re-send the ack
                 // do nothing
+#ifdef DEBUG
+                cout << endl;
+#endif
             }else if (returnCode == 0) {
                 // clientRequest.req == last_stored_req
                 // send the stored response to the client
@@ -233,13 +337,13 @@ int main(int argc, char *argv[])
 #ifdef DEBUG
             cout << "Server: Failure Mode 1: handling client data DON'T ack to client" << endl;
 #endif
-            returnCode =  handleClientData(clientTable, clientRequest, newString);
+            returnCode =  handleClientDataCompact(clientTable, clientRequest, newString);
             strcpy(clientString, newString.c_str() );
         }
         else if(fp == 0)
         {//do nothing
 #ifdef DEBUG
-            cout << "Server: Failure Mode 2: do nothing " << endl;
+            cout << "Server: Failure Mode 2: do nothing " << endl << endl;
 #endif
             continue;
         }

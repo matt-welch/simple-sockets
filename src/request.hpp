@@ -32,6 +32,11 @@ typedef struct request
         char c;              //random char client sends to server
 }request_t;
 
+typedef struct compact_request_data{
+    int req;    /* client request number */
+    char clientString[strLen+1]; /* current client string held by the server */
+}request_data_t;
+
 char addressBuffer[INET_ADDRSTRLEN]; //INET_ADDRSTRLEN = 16
 
 void DieWithError(const char *errorMessage) /* External error handling function */

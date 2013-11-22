@@ -6,8 +6,9 @@ using std::vector;
 
 // client_data is a vector of the last few strings that the server has updated 
 typedef vector< string > client_data_t;
+typedef vector< request_data_t > compact_data_t;
 
 // client_table is a map of the client key to a vector of strings
 typedef map< string, client_data_t > client_table_t;
-
+typedef map< string, compact_data_t > compact_table_t;
 
