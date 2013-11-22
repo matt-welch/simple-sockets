@@ -104,4 +104,4 @@ void printRequestStructure(request_t clientRequest){
 }
 
 // the following are likely unused
-#define ECHOMAX 255     /* Longest string to echo */
+#define ECHOMAX 6     /* Longest string to echo */
