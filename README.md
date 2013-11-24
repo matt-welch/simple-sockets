@@ -1,13 +1,13 @@
 simple-sockets
 ==============
-Filename:    README.md
-Name:        readme for UDP Simple Sockets client and server programs
-Authors:     Jesse Quale, Matt Welch
-School:      Arizona State University
-Class:       CSE434: Introduction to Networks
-Instructor:  Dr. Violet Syrotiuk
-Section:     71101
-Term:        Fall 2013
+Filename:   README.md
+Name:       readme for UDP Simple Sockets client and server programs
+Authors:    Jesse Quale, Matt Welch
+School:     Arizona State University
+Class:      CSE434: Introduction to Networks
+Instructor: Dr. Violet Syrotiuk
+Section:    71101
+Term:       Fall 2013
 Description: Simple sockets client/server for CSE434: Networks
 
 Instructions
@@ -20,8 +20,8 @@ network. Once you have two terminal windows open navigate to the directory where
 Team-9.zip files were extracted in both terminal windows.
 
 Build the program by typing
- 
-   make
+
+    make
 
 at the command prompt in one terminal if on the same host and both terminals if on 
 different hosts and press enter. 
