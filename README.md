@@ -92,13 +92,13 @@ was borrowed and adapted from these sources.  The client and server in
 simple-sockets will thus the User Datagram Protocol to communicate and rely on 
 their own recordkeeping for error handling and missed communications.  Instead 
 of simply sending an echo string, they are communicating with a request 
-structure sent from the client to the serrver and a string acknowledgement sent 
+structure sent from the client to the server and a string acknowledgement sent 
 from the server to the client.  
 
 The server was designed with C++ data structures in mind for ease of use.  The 
 client data is stored in a Standard Template Library `map` data structure, 
 where the key is the string `<IP address>_<Incarnation Number>_<Client Number>` 
-and the value type is a STL `vector` of structs, each containing the request 
+and the value type is a STL `vector` of structures, each containing the request 
 numbers and current client string held by the server. 
 It is believed that the server should only need to store the most recent client 
 string and corresponding request, but we thought it useful for the server to 
@@ -113,11 +113,11 @@ sent to the client containing the current string held by the server.  This ACK
 is implementation dependent, but this seemed to be the minimum amount of data 
 that the server could send back to the client to effectively communicate its 
 status.  
-If the request number of the new request is equal to the most recent request stored 
-by the server, the server ACKS to the client with the stored string.  If the new 
-request number is older than the last request stored by the server, the server 
-does nothing. Each request from the client to the server is a standardized structure 
-provided to us.  
+If the request number of the new request is equal to the most recent request 
+stored by the server, the server ACKS to the client with the stored string.  
+If the new request number is older than the last request stored by the server, 
+the server does nothing. Each request from the client to the server is a 
+standardized structure provided to us.  
 
 The server may fail in two ways, each with a probability of 10%.  The first 
 failure mode has the server store the request data appropriately, but not send 
@@ -160,7 +160,7 @@ file inc.txt.  At each request iteration, the incarnation number is read from
 this file under a non-blocking a file read lock and writes are handled with a 
 write lock which will prevent other read-locks from granting during the write 
 operation.  The client then proceeds to send the request to the server, which 
-will result in the server identifyig it as a new client key and creating a new 
+will result in the server identifying it as a new client key and creating a new 
 entry in its table.  At each request iteration, the client also checks to see 
 if another client on the same host has updated the incarnation number then 
 updates its incarnation number accordingly.  
