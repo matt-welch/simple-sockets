@@ -1,7 +1,7 @@
 #!/bin/bash
 # filename launch_multiple_clients.sh
 
-make 
+#make 
 
 GENERAL2=129.219.102.8
 GENERAL1=129.219.10.241
@@ -12,6 +12,12 @@ then
     NUM_CLIENTS=5
 else
     NUM_CLIENTS=$1
+fi
+if [ -z $2 ]
+then
+    STARTNUM=1
+else
+    STARTNUM=$2
 fi
 
 
@@ -24,7 +30,7 @@ fi
 
 echo "Beginning multiple client test with incarnation number = $(cat inc.txt)"
 
-for (( i=1; i<=$NUM_CLIENTS; i++ ))
+for (( i=$STARTNUM; i<=$NUM_CLIENTS+$STARTNUM-1; i++ ))
 do
     CLIENTNUM=$i
     echo "Launching Client $CLIENTNUM, connecting to server at ${SERVER_IP}:${PORTNUM}"
